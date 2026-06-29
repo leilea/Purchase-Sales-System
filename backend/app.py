@@ -53,7 +53,7 @@ def create_app():
 
     @app.route('/api/health')
     def health():
-        return jsonify({'status': 'ok', 'message': 'Claw ERP API'})
+        return jsonify({'status': 'ok', 'message': 'PSS管理系统 API'})
 
     with app.app_context():
         os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)

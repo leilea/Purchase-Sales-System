@@ -1,6 +1,6 @@
-# Claw ERP
+# PSS管理系统
 
-Python + Vue 进销存管理系统
+Python + Vue PSS管理系统
 
 ## 技术栈
 
