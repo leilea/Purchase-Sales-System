@@ -2,14 +2,41 @@
   <div class="sales">
     <div class="header">
       <h2>销售管理</h2>
-      <el-button type="primary" @click="handleAdd">新建销售订单</el-button>
+      <div>
+        <input ref="fileInput" type="file" accept=".xls,.xlsx" style="display:none" @change="handleFileUpload" />
+        <el-button type="success" @click="$refs.fileInput.click()">导入订货单</el-button>
+        <el-button type="primary" @click="handleAdd">新建订货单</el-button>
+      </div>
     </div>
+    <el-card style="margin-bottom: 16px">
+      <el-form :inline="true" :model="filters">
+        <el-form-item label="订货单号">
+          <el-input v-model="filters.order_no" placeholder="订货单号" clearable @clear="loadData" @keyup.enter="loadData" />
+        </el-form-item>
+        <el-form-item label="客户">
+          <el-input v-model="filters.customer_name" placeholder="客户名称" clearable @clear="loadData" @keyup.enter="loadData" />
+        </el-form-item>
+        <el-form-item label="订单日期">
+          <el-date-picker v-model="filters.dateRange" type="daterange" value-format="YYYY-MM-DD" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" @change="loadData" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="loadData">查询</el-button>
+          <el-button @click="resetFilters">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
     <el-card>
       <el-table :data="tableData" v-loading="loading" stripe>
-        <el-table-column prop="order_no" label="订单号" width="150" />
+        <el-table-column prop="order_no" label="订货单号" width="150" />
         <el-table-column prop="customer_name" label="客户" />
         <el-table-column prop="order_date" label="订单日期" width="120" />
-        <el-table-column prop="total_amount" label="总金额" width="120" />
+        <el-table-column prop="total_amount" label="订单金额" width="120" />
+        <el-table-column prop="gross_profit" label="毛利润" width="120" />
+        <el-table-column label="毛利率" width="100">
+          <template #default="{ row }">
+            <span>{{ row.total_amount && Number(row.total_amount) ? (Number(row.gross_profit) / Number(row.total_amount) * 100).toFixed(1) + '%' : '-' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)">{{ getStatusText(row.status) }}</el-tag>
@@ -35,88 +62,23 @@
       />
     </el-card>
 
-    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="800px">
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
-        <el-form-item label="客户" prop="customer_id">
-          <el-select v-model="form.customer_id" placeholder="请选择客户" style="width: 100%">
-            <el-option v-for="c in customers" :key="c.id" :label="c.name" :value="c.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="订单日期" prop="order_date">
-          <el-date-picker v-model="form.order_date" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
-        </el-form-item>
-        <el-form-item label="备注" prop="remark">
-          <el-input v-model="form.remark" type="textarea" />
-        </el-form-item>
-        <el-form-item label="商品明细">
-          <el-table :data="form.items" border size="small">
-            <el-table-column label="商品" width="200">
-              <template #default="{ row, $index }">
-                <el-select v-model="row.product_id" placeholder="选择商品" @change="onProductChange($index)">
-                  <el-option v-for="p in products" :key="p.id" :label="p.name" :value="p.id" />
-                </el-select>
-              </template>
-            </el-table-column>
-            <el-table-column label="数量" width="120">
-              <template #default="{ row }">
-                <el-input-number v-model="row.quantity" :min="1" :precision="2" size="small" @change="calcAmount(row)" />
-              </template>
-            </el-table-column>
-            <el-table-column label="单价" width="120">
-              <template #default="{ row }">
-                <el-input-number v-model="row.unit_price" :min="0" :precision="2" size="small" @change="calcAmount(row)" />
-              </template>
-            </el-table-column>
-            <el-table-column label="金额">
-              <template #default="{ row }">
-                {{ row.amount?.toFixed(2) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="60">
-              <template #default="{ $index }">
-                <el-button type="danger" size="small" @click="form.items.splice($index, 1)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-button type="primary" size="small" @click="addItem" style="margin-top: 10px">添加商品</el-button>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmit">确定</el-button>
-      </template>
-    </el-dialog>
+
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getSales, createSale, updateSale, deleteSale, deliverSale } from '../api/modules/sales'
-import { getCustomers } from '../api/modules/customers'
-import { getProducts } from '../api/modules/products'
+import { getSales, deleteSale, deliverSale, uploadSale } from '../api/modules/sales'
 
+const router = useRouter()
 const loading = ref(false)
 const tableData = ref([])
-const customers = ref([])
-const products = ref([])
 const pagination = reactive({ page: 1, pageSize: 10, total: 0 })
+const filters = reactive({ order_no: '', customer_name: '', dateRange: null })
 
-const dialogVisible = ref(false)
-const dialogTitle = ref('')
-const formRef = ref()
-const form = reactive({
-  id: null,
-  customer_id: null,
-  order_date: '',
-  remark: '',
-  items: []
-})
-
-const rules = {
-  customer_id: [{ required: true, message: '请选择客户', trigger: 'change' }],
-  order_date: [{ required: true, message: '请选择日期', trigger: 'change' }]
-}
+const fileInput = ref()
 
 const getStatusType = (status) => {
   const types = { draft: 'info', confirmed: 'warning', delivered: 'success', cancelled: 'danger' }
@@ -131,7 +93,14 @@ const getStatusText = (status) => {
 const loadData = async () => {
   loading.value = true
   try {
-    const res = await getSales({ page: pagination.page, per_page: pagination.pageSize })
+    const params = { page: pagination.page, per_page: pagination.pageSize }
+    if (filters.order_no) params.order_no = filters.order_no
+    if (filters.customer_name) params.customer_name = filters.customer_name
+    if (filters.dateRange) {
+      params.start_date = filters.dateRange[0]
+      params.end_date = filters.dateRange[1]
+    }
+    const res = await getSales(params)
     tableData.value = res.data.items || []
     pagination.total = res.data.total || 0
   } catch (e) {
@@ -141,26 +110,35 @@ const loadData = async () => {
   }
 }
 
-const loadOptions = async () => {
-  try {
-    const [cRes, pRes] = await Promise.all([getCustomers({ page: 1, per_page: 100 }), getProducts({ page: 1, per_page: 100 })])
-    customers.value = cRes.data.items || []
-    products.value = pRes.data.items || []
-  } catch (e) {
-    console.error(e)
-  }
+const resetFilters = () => {
+  filters.order_no = ''
+  filters.customer_name = ''
+  filters.dateRange = null
+  pagination.page = 1
+  loadData()
 }
 
 const handleAdd = () => {
-  Object.assign(form, { id: null, customer_id: null, order_date: new Date().toISOString().split('T')[0], remark: '', items: [] })
-  dialogTitle.value = '新建销售订单'
-  dialogVisible.value = true
+  router.push('/sales/create')
+}
+
+const handleFileUpload = async (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+
+  try {
+    await uploadSale(file)
+    ElMessage.success('导入成功')
+    loadData()
+  } catch (err) {
+    ElMessage.error(err.response?.data?.error || '导入失败')
+  } finally {
+    fileInput.value.value = ''
+  }
 }
 
 const handleEdit = (row) => {
-  Object.assign(form, { ...row, items: row.items || [] })
-  dialogTitle.value = '编辑销售订单'
-  dialogVisible.value = true
+  router.push(`/sales/${row.id}/edit`)
 }
 
 const handleDelete = async (row) => {
@@ -185,44 +163,8 @@ const handleDeliver = async (row) => {
   }
 }
 
-const addItem = () => {
-  form.items.push({ product_id: null, quantity: 1, unit_price: 0, amount: 0 })
-}
-
-const onProductChange = (index) => {
-  const product = products.value.find(p => p.id === form.items[index].product_id)
-  if (product) {
-    form.items[index].unit_price = product.sale_price || 0
-    calcAmount(form.items[index])
-  }
-}
-
-const calcAmount = (row) => {
-  row.amount = (row.quantity || 0) * (row.unit_price || 0)
-}
-
-const handleSubmit = async () => {
-  const valid = await formRef.value.validate().catch(() => false)
-  if (!valid) return
-
-  try {
-    if (form.id) {
-      await updateSale(form.id, form)
-      ElMessage.success('更新成功')
-    } else {
-      await createSale(form)
-      ElMessage.success('创建成功')
-    }
-    dialogVisible.value = false
-    loadData()
-  } catch (e) {
-    console.error(e)
-  }
-}
-
 onMounted(() => {
   loadData()
-  loadOptions()
 })
 </script>
 

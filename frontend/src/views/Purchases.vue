@@ -5,6 +5,23 @@
       <el-button type="primary" @click="handleAdd">新建采购订单</el-button>
     </div>
     <el-card>
+      <el-form :inline="true" @keyup.enter="loadData" style="margin-bottom: 16px">
+        <el-form-item label="订单号">
+          <el-input v-model="search.order_no" placeholder="请输入" clearable @clear="loadData" />
+        </el-form-item>
+        <el-form-item label="供应商">
+          <el-input v-model="search.supplier_name" placeholder="请输入" clearable @clear="loadData" />
+        </el-form-item>
+        <el-form-item label="订单日期">
+          <el-date-picker v-model="search.start_date" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width: 140px" />
+          <span style="margin: 0 8px">-</span>
+          <el-date-picker v-model="search.end_date" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width: 140px" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="loadData">查询</el-button>
+          <el-button @click="resetSearch">重置</el-button>
+        </el-form-item>
+      </el-form>
       <el-table :data="tableData" v-loading="loading" stripe>
         <el-table-column prop="order_no" label="订单号" width="150" />
         <el-table-column prop="supplier_name" label="供应商" />
@@ -30,7 +47,7 @@
         :total="pagination.total"
         :page-sizes="[10, 20, 50]"
         layout="total, sizes, prev, pager, next"
-        @change="loadData"
+        @change="onPageChange"
         style="margin-top: 20px"
       />
     </el-card>
@@ -101,6 +118,12 @@ const tableData = ref([])
 const suppliers = ref([])
 const products = ref([])
 const pagination = reactive({ page: 1, pageSize: 10, total: 0 })
+const search = reactive({
+  order_no: '',
+  supplier_name: '',
+  start_date: '',
+  end_date: ''
+})
 
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
@@ -128,10 +151,20 @@ const getStatusText = (status) => {
   return texts[status] || status
 }
 
+const buildParams = () => {
+  const params = { page: pagination.page, per_page: pagination.pageSize }
+  if (search.order_no) params.order_no = search.order_no
+  if (search.supplier_name) params.supplier_name = search.supplier_name
+  if (search.start_date) params.start_date = search.start_date
+  if (search.end_date) params.end_date = search.end_date
+  return params
+}
+
 const loadData = async () => {
   loading.value = true
+  pagination.page = 1
   try {
-    const res = await getPurchases({ page: pagination.page, per_page: pagination.pageSize })
+    const res = await getPurchases(buildParams())
     tableData.value = res.data.items || []
     pagination.total = res.data.total || 0
   } catch (e) {
@@ -139,6 +172,27 @@ const loadData = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const onPageChange = async () => {
+  loading.value = true
+  try {
+    const res = await getPurchases(buildParams())
+    tableData.value = res.data.items || []
+    pagination.total = res.data.total || 0
+  } catch (e) {
+    console.error(e)
+  } finally {
+    loading.value = false
+  }
+}
+
+const resetSearch = () => {
+  search.order_no = ''
+  search.supplier_name = ''
+  search.start_date = ''
+  search.end_date = ''
+  loadData()
 }
 
 const loadOptions = async () => {

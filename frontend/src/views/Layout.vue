@@ -1,7 +1,7 @@
 <template>
   <el-container class="layout-container">
     <el-aside width="200px">
-      <div class="logo">Claw ERP</div>
+      <div class="logo">PSS管理系统</div>
       <el-menu
         :default-active="activeMenu"
         router
@@ -38,6 +38,10 @@
           <el-icon><Box /></el-icon>
           <span>库存管理</span>
         </el-menu-item>
+        <el-menu-item index="/invoices">
+          <el-icon><Document /></el-icon>
+          <span>发票管理</span>
+        </el-menu-item>
       </el-menu>
     </el-aside>
     <el-container>
@@ -60,7 +64,7 @@
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { House, Goods, Shop, User, ShoppingCart, Sell, Box } from '@element-plus/icons-vue'
+import { House, Goods, Shop, User, ShoppingCart, Sell, Box, Document } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -91,6 +95,9 @@ const handleLogout = async () => {
 }
 .el-menu-vertical {
   border-right: none;
+}
+.el-menu-vertical :deep(.el-menu-item) {
+  font-size: 18px;
 }
 .el-header {
   background-color: #fff;

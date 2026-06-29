@@ -1,127 +1,199 @@
 <template>
   <div class="dashboard">
-    <h2>仪表盘</h2>
+    <div class="header-row">
+      <h2>仪表盘</h2>
+      <el-date-picker
+        v-model="currentMonth"
+        type="month"
+        value-format="YYYY-MM"
+        placeholder="选择月份"
+        style="width: 180px"
+      />
+    </div>
+
     <el-row :gutter="20">
-      <el-col :span="6">
+      <el-col :span="8">
         <el-card shadow="hover">
           <div class="stat-card">
-            <el-icon class="stat-icon" color="#409eff"><Goods /></el-icon>
+            <el-icon class="stat-icon" color="#409eff"><Coin /></el-icon>
             <div class="stat-info">
-              <div class="stat-value">{{ stats.products }}</div>
-              <div class="stat-label">商品数量</div>
+              <div class="stat-value">{{ formatAmount(stats.monthly.total_amount) }}</div>
+              <div class="stat-label">当月订单金额统计</div>
             </div>
           </div>
         </el-card>
       </el-col>
-      <el-col :span="6">
+      <el-col :span="8">
         <el-card shadow="hover">
           <div class="stat-card">
-            <el-icon class="stat-icon" color="#67c23a"><Shop /></el-icon>
+            <el-icon class="stat-icon" color="#67c23a"><TrendCharts /></el-icon>
             <div class="stat-info">
-              <div class="stat-value">{{ stats.suppliers }}</div>
-              <div class="stat-label">供应商</div>
+              <div class="stat-value">{{ formatAmount(stats.monthly.gross_profit) }}</div>
+              <div class="stat-label">当月毛利润统计</div>
             </div>
           </div>
         </el-card>
       </el-col>
-      <el-col :span="6">
+      <el-col :span="8">
         <el-card shadow="hover">
           <div class="stat-card">
-            <el-icon class="stat-icon" color="#e6a23c"><User /></el-icon>
+            <el-icon class="stat-icon" color="#e6a23c"><UserFilled /></el-icon>
             <div class="stat-info">
-              <div class="stat-value">{{ stats.customers }}</div>
-              <div class="stat-label">客户</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="stat-card">
-            <el-icon class="stat-icon" color="#f56c6c"><Box /></el-icon>
-            <div class="stat-info">
-              <div class="stat-value">{{ stats.inventory }}</div>
-              <div class="stat-label">库存商品</div>
+              <div class="stat-value">{{ stats.monthly.new_customers }}</div>
+              <div class="stat-label">当月新增客户统计</div>
             </div>
           </div>
         </el-card>
       </el-col>
     </el-row>
+
+    <el-card shadow="hover" style="margin-top: 20px">
+      <template #header>
+        <span>当年每月趋势</span>
+      </template>
+      <div ref="chartRef" style="height: 360px"></div>
+    </el-card>
+
     <el-row :gutter="20" style="margin-top: 20px">
       <el-col :span="12">
         <el-card>
           <template #header>
-            <span>最近采购订单</span>
+            <span>当月客户订单排名</span>
           </template>
-          <el-table :data="recentPurchases" size="small">
-            <el-table-column prop="order_no" label="订单号" />
-            <el-table-column prop="total_amount" label="金额" />
-            <el-table-column prop="status" label="状态" />
+          <el-table :data="stats.monthly_customer_ranking.slice(0, 10)" size="small" max-height="360">
+            <el-table-column type="index" label="排名" width="60" />
+            <el-table-column prop="customer_name" label="客户名称" />
+            <el-table-column prop="total_amount" label="订单金额" :formatter="(r) => formatAmount(r.total_amount)" />
           </el-table>
         </el-card>
       </el-col>
       <el-col :span="12">
         <el-card>
           <template #header>
-            <span>最近销售订单</span>
+            <span>当年客户订单排名</span>
           </template>
-          <el-table :data="recentSales" size="small">
-            <el-table-column prop="order_no" label="订单号" />
-            <el-table-column prop="total_amount" label="金额" />
-            <el-table-column prop="status" label="状态" />
+          <el-table :data="stats.yearly_customer_ranking.slice(0, 10)" size="small" max-height="360">
+            <el-table-column type="index" label="排名" width="60" />
+            <el-table-column prop="customer_name" label="客户名称" />
+            <el-table-column prop="total_amount" label="订单金额" :formatter="(r) => formatAmount(r.total_amount)" />
           </el-table>
         </el-card>
       </el-col>
     </el-row>
+
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { Goods, Shop, User, Box } from '@element-plus/icons-vue'
-import { getProducts } from '../api/modules/products'
-import { getSuppliers } from '../api/modules/suppliers'
-import { getCustomers } from '../api/modules/customers'
-import { getInventory } from '../api/modules/inventory'
-import { getPurchases } from '../api/modules/purchases'
-import { getSales } from '../api/modules/sales'
+import { ref, onMounted, watch, onUnmounted, nextTick } from 'vue'
+import { Coin, TrendCharts, UserFilled } from '@element-plus/icons-vue'
+import * as echarts from 'echarts'
+import { getDashboardStats } from '../api/modules/dashboard'
+
+
+const currentMonth = ref(new Date().toISOString().slice(0, 7))
+const chartRef = ref(null)
+let chartInstance = null
 
 const stats = ref({
-  products: 0,
-  suppliers: 0,
-  customers: 0,
-  inventory: 0
+  monthly: { total_amount: 0, gross_profit: 0, new_customers: 0 },
+  yearly: [],
+  monthly_customer_ranking: [],
+  yearly_customer_ranking: []
 })
 
-const recentPurchases = ref([])
-const recentSales = ref([])
+function formatAmount(val) {
+  const num = Number(val) || 0
+  return '¥' + num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
 
-const loadData = async () => {
+function initChart() {
+  if (!chartRef.value) return
+  if (chartInstance) chartInstance.dispose()
+  chartInstance = echarts.init(chartRef.value)
+  updateChart()
+}
+
+function updateChart() {
+  if (!chartInstance) return
+  const months = stats.value.yearly.map((_, i) => `${i + 1}月`)
+  chartInstance.setOption({
+    tooltip: {
+      trigger: 'axis',
+      valueFormatter: (v) => '¥' + Number(v).toLocaleString()
+    },
+    legend: {
+      data: ['订单金额', '毛利润'],
+      top: 0
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      data: months
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: {
+        formatter: (v) => '¥' + (v >= 10000 ? (v / 10000).toFixed(0) + 'w' : v)
+      }
+    },
+    series: [
+      {
+        name: '订单金额',
+        type: 'bar',
+        data: stats.value.yearly.map((d) => d.total_amount),
+        itemStyle: { color: '#409eff' }
+      },
+      {
+        name: '毛利润',
+        type: 'bar',
+        data: stats.value.yearly.map((d) => d.gross_profit),
+        itemStyle: { color: '#67c23a' }
+      }
+    ]
+  })
+}
+
+async function loadData() {
   try {
-    const [pRes, sRes, cRes, iRes, purRes, salRes] = await Promise.all([
-      getProducts({ page: 1, per_page: 1 }),
-      getSuppliers({ page: 1, per_page: 1 }),
-      getCustomers({ page: 1, per_page: 1 }),
-      getInventory({ page: 1, per_page: 1 }),
-      getPurchases({ page: 1, per_page: 5 }),
-      getSales({ page: 1, per_page: 5 })
-    ])
-    stats.value.products = pRes.data.total || 0
-    stats.value.suppliers = sRes.data.total || 0
-    stats.value.customers = cRes.data.total || 0
-    stats.value.inventory = iRes.data.total || 0
-    recentPurchases.value = purRes.data.items || []
-    recentSales.value = salRes.data.items || []
+    const sRes = await getDashboardStats({ month: currentMonth.value })
+    stats.value = sRes.data
+    await nextTick()
+    updateChart()
   } catch (e) {
     console.error(e)
   }
 }
 
-onMounted(loadData)
+watch(currentMonth, loadData)
+
+onMounted(async () => {
+  await loadData()
+  await nextTick()
+  initChart()
+})
+
+onUnmounted(() => {
+  if (chartInstance) {
+    chartInstance.dispose()
+    chartInstance = null
+  }
+})
 </script>
 
 <style scoped>
 .dashboard h2 {
+  margin: 0;
+}
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 20px;
 }
 .stat-card {
@@ -133,7 +205,7 @@ onMounted(loadData)
   font-size: 48px;
 }
 .stat-value {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: bold;
 }
 .stat-label {

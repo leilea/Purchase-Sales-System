@@ -56,6 +56,15 @@
             <el-option v-for="u in units" :key="u.id" :label="u.name" :value="u.id" />
           </el-select>
         </el-form-item>
+        <el-form-item label="规格" prop="spec">
+          <el-input v-model="form.spec" />
+        </el-form-item>
+        <el-form-item label="材质等级" prop="material_grade">
+          <el-input v-model="form.material_grade" />
+        </el-form-item>
+        <el-form-item label="表面处理" prop="surface_treatment">
+          <el-input v-model="form.surface_treatment" />
+        </el-form-item>
         <el-form-item label="成本价" prop="cost_price">
           <el-input-number v-model="form.cost_price" :min="0" :precision="2" />
         </el-form-item>
@@ -100,6 +109,9 @@ const form = reactive({
   name: '',
   category_id: null,
   unit_id: null,
+  spec: '',
+  material_grade: '',
+  surface_treatment: '',
   cost_price: 0,
   sale_price: 0,
   stock_min: 0,
@@ -136,7 +148,7 @@ const loadOptions = async () => {
 }
 
 const handleAdd = () => {
-  Object.assign(form, { id: null, code: '', name: '', category_id: null, unit_id: null, cost_price: 0, sale_price: 0, stock_min: 0, stock_max: 0, status: 1 })
+  Object.assign(form, { id: null, code: '', name: '', category_id: null, unit_id: null, spec: '', material_grade: '', surface_treatment: '', cost_price: 0, sale_price: 0, stock_min: 0, stock_max: 0, status: 1 })
   dialogTitle.value = '新增商品'
   dialogVisible.value = true
 }

@@ -37,7 +37,7 @@ def create_app():
         print(f'[JWT Expired] header={jwt_header}')
         return jsonify({'error': 'Token has expired'}), 401
 
-    from routes import auth, products, suppliers, customers, purchases, sales, inventory, categories, units
+    from routes import auth, products, suppliers, customers, purchases, sales, inventory, categories, units, dashboard, invoices
     
     app.register_blueprint(auth.bp, url_prefix='/api/auth')
     app.register_blueprint(products.bp, url_prefix='/api/products')
@@ -48,6 +48,8 @@ def create_app():
     app.register_blueprint(inventory.bp, url_prefix='/api/inventory')
     app.register_blueprint(categories.bp, url_prefix='/api/categories')
     app.register_blueprint(units.bp, url_prefix='/api/units')
+    app.register_blueprint(dashboard.bp)
+    app.register_blueprint(invoices.bp, url_prefix='/api/invoices')
 
     @app.route('/api/health')
     def health():
@@ -56,9 +58,38 @@ def create_app():
     with app.app_context():
         os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)
         db.create_all()
+        _migrate_db()
         _create_default_admin()
 
     return app
+
+
+def _migrate_db():
+    from sqlalchemy import inspect, text
+    inspector = inspect(db.engine)
+    
+    # Product new columns
+    for col in ['spec', 'material_grade', 'surface_treatment']:
+        if col not in [c['name'] for c in inspector.get_columns('products')]:
+            db.session.execute(text(f'ALTER TABLE products ADD COLUMN {col} VARCHAR(200)'))
+    
+    # SalesOrder new columns
+    for col, typ in [('address', 'TEXT'), ('freight', 'NUMERIC(10,2) DEFAULT 0'), ('invoice_required', 'INTEGER DEFAULT 0'), ('gross_profit', 'NUMERIC(10,2) DEFAULT 0')]:
+        if col not in [c['name'] for c in inspector.get_columns('sales_orders')]:
+            db.session.execute(text(f'ALTER TABLE sales_orders ADD COLUMN {col} {typ}'))
+    
+    # SalesOrderItem new columns
+    for col, typ in [('spec', 'VARCHAR(200)'), ('material_grade', 'VARCHAR(100)'), ('surface_treatment', 'VARCHAR(200)'), ('matching', 'VARCHAR(100)'), ('remark', 'TEXT')]:
+        if col not in [c['name'] for c in inspector.get_columns('sales_order_items')]:
+            db.session.execute(text(f'ALTER TABLE sales_order_items ADD COLUMN {col} {typ}'))
+    
+    # Create new tables if not exist
+    for table_name in ['sales_order_suppliers', 'sales_order_logistics']:
+        if table_name not in inspector.get_table_names():
+            db.create_all()
+            break
+    
+    db.session.commit()
 
 
 def _create_default_admin():
@@ -80,4 +111,18 @@ def _create_default_admin():
 app = create_app()
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    import re
+    import sys
+    from pathlib import Path
+    from werkzeug.serving import run_simple
+
+    backend_dir = Path(__file__).parent
+    extra = {str(p) for p in backend_dir.rglob('*.py')}
+    site_pkgs = re.escape(str(Path(sys.base_prefix) / 'Lib' / 'site-packages'))
+    run_simple(
+        '127.0.0.1', 5000, app,
+        use_reloader=True,
+        use_debugger=True,
+        extra_files=list(extra),
+        exclude_patterns=[site_pkgs + re.escape('\\') + '.*'],
+    )

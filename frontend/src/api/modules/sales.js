@@ -6,3 +6,10 @@ export const createSale = (data) => axios.post('/sales', data)
 export const updateSale = (id, data) => axios.put(`/sales/${id}`, data)
 export const deleteSale = (id) => axios.delete(`/sales/${id}`)
 export const deliverSale = (id, data) => axios.post(`/sales/${id}/deliver`, data)
+export const uploadSale = (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return axios.post('/sales/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}

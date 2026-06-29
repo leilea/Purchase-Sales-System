@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, PurchaseOrder, PurchaseOrderItem, Inventory, InventoryLog, Product
+from models import db, PurchaseOrder, PurchaseOrderItem, Inventory, InventoryLog, Product, Supplier
 from datetime import datetime
 import uuid
 
@@ -42,12 +42,24 @@ def list_purchases():
     per_page = request.args.get('per_page', 20, type=int)
     status = request.args.get('status', '')
     supplier_id = request.args.get('supplier_id', type=int)
+    order_no = request.args.get('order_no', '')
+    supplier_name = request.args.get('supplier_name', '')
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
     
     query = PurchaseOrder.query
     if status:
         query = query.filter_by(status=status)
     if supplier_id:
         query = query.filter_by(supplier_id=supplier_id)
+    if order_no:
+        query = query.filter(PurchaseOrder.order_no.like(f'%{order_no}%'))
+    if supplier_name:
+        query = query.join(Supplier).filter(Supplier.name.like(f'%{supplier_name}%'))
+    if start_date:
+        query = query.filter(PurchaseOrder.order_date >= datetime.strptime(start_date, '%Y-%m-%d').date())
+    if end_date:
+        query = query.filter(PurchaseOrder.order_date <= datetime.strptime(end_date, '%Y-%m-%d').date())
     
     pagination = query.order_by(PurchaseOrder.id.desc()).paginate(page=page, per_page=per_page, error_out=False)
     

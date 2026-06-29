@@ -21,16 +21,16 @@
         <el-button @click="handleReset">重置</el-button>
       </div>
     </div>
-    <el-card>
-      <el-table :data="tableData" v-loading="loading" stripe>
+    <el-card style="width: 100%">
+      <el-table :data="tableData" v-loading="loading" stripe style="width: 100%">
         <el-table-column prop="code" label="编码" width="120" />
-        <el-table-column prop="name" label="客户名称" width="130" />
+        <el-table-column prop="name" label="客户名称" min-width="130" />
         <el-table-column prop="level" label="等级" width="80" />
-        <el-table-column prop="contact" label="联系人" width="90" />
-        <el-table-column prop="phone" label="联系电话" width="130" />
-        <el-table-column prop="company_name" label="公司全称" width="180" />
-        <el-table-column prop="tax_id" label="纳税人识别号" width="150" />
-        <el-table-column prop="invoice_type" label="发票类型" width="120" />
+        <el-table-column prop="contact" label="联系人" min-width="90" />
+        <el-table-column prop="phone" label="联系电话" min-width="130" />
+        <el-table-column prop="company_name" label="公司全称" min-width="180" />
+        <el-table-column prop="tax_id" label="纳税人识别号" min-width="150" />
+        <el-table-column prop="invoice_type" label="发票类型" min-width="120" />
         <el-table-column prop="status" label="合作状态" width="90">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'danger'">
@@ -38,10 +38,10 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="140" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="row.status === 0" size="small" type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -81,23 +81,23 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="联系人" prop="contact">
-              <el-input v-model="form.contact" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="联系电话" prop="phone">
-              <el-input v-model="form.phone" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
             <el-form-item label="发票类型" prop="invoice_type">
               <el-select v-model="form.invoice_type" style="width: 100%">
                 <el-option label="增值税专用发票" value="增值税专用发票" />
                 <el-option label="增值税普通发票" value="增值税普通发票" />
               </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="联系人" prop="contact">
+              <el-input v-model="form.contact" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="联系电话" prop="phone">
+              <el-input v-model="form.phone" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -143,6 +143,7 @@
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
+
   </div>
 </template>
 
@@ -281,11 +282,16 @@ onMounted(loadData)
 </script>
 
 <style scoped>
+.customers {
+  margin: -20px;
+  width: calc(100% + 40px);
+}
 .customers .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  padding: 0 20px;
 }
 .customers h2 {
   margin: 0;
@@ -294,18 +300,20 @@ onMounted(loadData)
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: 12px 20px;
   background: #fff;
-  border-radius: 4px;
-  margin-bottom: 16px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
-}
-.customers .search-bar .el-form {
   margin-bottom: 0;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
 }
 .customers .search-actions {
   display: flex;
   gap: 8px;
   flex-shrink: 0;
+}
+.customers .el-card {
+  border-radius: 0;
+}
+.customers .el-card :deep(.el-card__body) {
+  padding: 20px;
 }
 </style>

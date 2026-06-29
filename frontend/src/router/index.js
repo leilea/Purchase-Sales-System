@@ -43,9 +43,24 @@ const routes = [
         component: () => import('../views/Sales.vue')
       },
       {
+        path: 'sales/create',
+        name: 'SalesCreate',
+        component: () => import('../views/SalesOrderForm.vue')
+      },
+      {
+        path: 'sales/:id/edit',
+        name: 'SalesEdit',
+        component: () => import('../views/SalesOrderForm.vue')
+      },
+      {
         path: 'inventory',
         name: 'Inventory',
         component: () => import('../views/Inventory.vue')
+      },
+      {
+        path: 'invoices',
+        name: 'Invoices',
+        component: () => import('../views/Invoices.vue')
       }
     ]
   }

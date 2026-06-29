@@ -15,6 +15,9 @@ def serialize_product(p):
         'category_name': p.category.name if p.category else None,
         'unit_id': p.unit_id,
         'unit_name': p.unit.name if p.unit else None,
+        'spec': p.spec,
+        'material_grade': p.material_grade,
+        'surface_treatment': p.surface_treatment,
         'cost_price': float(p.cost_price) if p.cost_price else 0,
         'sale_price': float(p.sale_price) if p.sale_price else 0,
         'stock_min': p.stock_min,
@@ -75,6 +78,9 @@ def create_product():
         name=data.get('name'),
         category_id=data.get('category_id'),
         unit_id=data.get('unit_id'),
+        spec=data.get('spec'),
+        material_grade=data.get('material_grade'),
+        surface_treatment=data.get('surface_treatment'),
         cost_price=data.get('cost_price', 0),
         sale_price=data.get('sale_price', 0),
         stock_min=data.get('stock_min', 0),
@@ -104,6 +110,12 @@ def update_product(id):
         product.category_id = data['category_id']
     if 'unit_id' in data:
         product.unit_id = data['unit_id']
+    if 'spec' in data:
+        product.spec = data['spec']
+    if 'material_grade' in data:
+        product.material_grade = data['material_grade']
+    if 'surface_treatment' in data:
+        product.surface_treatment = data['surface_treatment']
     if 'cost_price' in data:
         product.cost_price = data['cost_price']
     if 'sale_price' in data:
