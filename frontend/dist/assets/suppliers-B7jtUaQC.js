@@ -1,0 +1,1 @@
+import{y as p}from"./index-DsVx45G4.js";const r=e=>p.get("/suppliers",{params:e}),u=e=>p.post("/suppliers",e),i=(e,s)=>p.put(`/suppliers/${e}`,s),l=e=>p.delete(`/suppliers/${e}`);export{u as c,l as d,r as g,i as u};

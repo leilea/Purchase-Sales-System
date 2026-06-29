@@ -1,0 +1,1 @@
+import{y as t}from"./index-DsVx45G4.js";const r=s=>t.get("/customers",{params:s}),c=s=>t.post("/customers",s),u=(s,e)=>t.put(`/customers/${s}`,e),m=s=>t.delete(`/customers/${s}`);export{c,m as d,r as g,u};

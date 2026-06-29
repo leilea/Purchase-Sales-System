@@ -23,6 +23,7 @@
         </el-form-item>
       </el-form>
       <el-table :data="tableData" v-loading="loading" stripe>
+        <el-table-column type="index" label="序号" width="60" />
         <el-table-column prop="order_no" label="订单号" width="150" />
         <el-table-column prop="supplier_name" label="供应商" />
         <el-table-column prop="order_date" label="订单日期" width="120" />

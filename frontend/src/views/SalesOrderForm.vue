@@ -118,12 +118,12 @@
         <el-tabs type="border-card" style="margin-top: 22px;">
           <el-tab-pane label="订单信息">
             <div style="overflow-x: auto">
-              <el-table :data="form.items" border size="small" style="width: 100%">
+              <el-table :data="displayItems" border size="small" style="width: 100%">
                 <el-table-column label="序号" min-width="50" type="index" />
                 <el-table-column label="产品名称" min-width="160">
                   <template #default="{ row, $index }">
-                    <el-select v-model="row.product_id" placeholder="选择商品" style="width: 100%" @change="onProductChange($index)" filterable>
-                      <el-option v-for="p in products" :key="p.id" :label="`${p.code} - ${p.name}`" :value="p.id" />
+                    <el-select v-model="row.product_id" placeholder="选择商品" style="width: 100%" @change="onProductChange($index + (itemPage - 1) * pageSize)" filterable>
+                      <el-option v-for="p in products" :key="p.id" :label="p.name" :value="p.id" />
                     </el-select>
                   </template>
                 </el-table-column>
@@ -174,7 +174,7 @@
                 </el-table-column>
                 <el-table-column label="操作" min-width="60" fixed="right">
                   <template #default="{ $index }">
-                    <el-button type="danger" size="small" @click="form.items.splice($index, 1)">删除</el-button>
+                    <el-button type="danger" size="small" @click="deleteItem($index)">删除</el-button>
                   </template>
                 </el-table-column>
                 <template #append>
@@ -183,11 +183,20 @@
                   </div>
                 </template>
               </el-table>
+              <el-pagination
+                v-if="form.items.length > 10"
+                v-model:current-page="itemPage"
+                :page-size="10"
+                :total="form.items.length"
+                layout="total, prev, pager, next"
+                small
+                style="margin-top: 10px; justify-content: center"
+              />
             </div>
           </el-tab-pane>
           <el-tab-pane label="供应商/委外加工信息">
             <div style="overflow-x: auto">
-              <el-table :data="form.suppliers" border size="small" style="width: 100%">
+              <el-table :data="displaySuppliers" border size="small" style="width: 100%">
                 <el-table-column label="序号" min-width="50" type="index" />
                 <el-table-column label="供应商" min-width="120">
                   <template #default="{ row }">
@@ -251,7 +260,7 @@
                 </el-table-column>
                 <el-table-column label="操作" min-width="60" fixed="right">
                   <template #default="{ $index }">
-                    <el-button type="danger" size="small" @click="form.suppliers.splice($index, 1)">删除</el-button>
+                    <el-button type="danger" size="small" @click="deleteSupplier($index)">删除</el-button>
                   </template>
                 </el-table-column>
                 <template #append>
@@ -260,6 +269,15 @@
                   </div>
                 </template>
               </el-table>
+              <el-pagination
+                v-if="form.suppliers.length > 10"
+                v-model:current-page="supplierPage"
+                :page-size="10"
+                :total="form.suppliers.length"
+                layout="total, prev, pager, next"
+                small
+                style="margin-top: 10px; justify-content: center"
+              />
             </div>
           </el-tab-pane>
           <el-tab-pane label="物流与杂费">
@@ -345,6 +363,9 @@ import { getProducts } from '../api/modules/products'
 
 const route = useRoute()
 const router = useRouter()
+const itemPage = ref(1)
+const supplierPage = ref(1)
+const pageSize = 10
 
 const isEdit = computed(() => !!route.params.id)
 
@@ -375,6 +396,16 @@ const rules = {
   customer_id: [{ required: true, message: '请选择客户', trigger: 'change' }],
   order_date: [{ required: true, message: '请选择日期', trigger: 'change' }]
 }
+
+const displayItems = computed(() => {
+  const start = (itemPage.value - 1) * pageSize
+  return form.items.slice(start, start + pageSize)
+})
+
+const displaySuppliers = computed(() => {
+  const start = (supplierPage.value - 1) * pageSize
+  return form.suppliers.slice(start, start + pageSize)
+})
 
 const totalAmount = computed(() => {
   const itemsTotal = form.items.reduce((sum, row) => sum + (row.amount || 0), 0)
@@ -427,12 +458,30 @@ const onCustomerChange = () => {
   }
 }
 
+const deleteItem = (idx) => {
+  const actualIdx = (itemPage.value - 1) * pageSize + idx
+  form.items.splice(actualIdx, 1)
+  if (form.items.length <= (itemPage.value - 1) * pageSize && itemPage.value > 1) {
+    itemPage.value--
+  }
+}
+
+const deleteSupplier = (idx) => {
+  const actualIdx = (supplierPage.value - 1) * pageSize + idx
+  form.suppliers.splice(actualIdx, 1)
+  if (form.suppliers.length <= (supplierPage.value - 1) * pageSize && supplierPage.value > 1) {
+    supplierPage.value--
+  }
+}
+
 const addItem = () => {
   form.items.push({ product_id: null, spec: '', material_grade: '', surface_treatment: '', matching: '', unit_name: '', quantity: 1, unit_price: 0, amount: 0, remark: '' })
+  itemPage.value = Math.ceil(form.items.length / pageSize)
 }
 
 const addSupplier = () => {
   form.suppliers.push({ supplier: '', product: '', spec: '', grade: '', surface_treatment: '', cost: 0, quantity: 0, total_weight: 0, unit_weight: 0, price: 0, packaging: '', freight: 0, ton_bag_forklift: '', remark: '' })
+  supplierPage.value = Math.ceil(form.suppliers.length / pageSize)
 }
 
 const addLogistics = () => {

@@ -27,6 +27,7 @@
     </el-card>
     <el-card>
       <el-table :data="tableData" v-loading="loading" stripe>
+        <el-table-column type="index" label="序号" width="60" />
         <el-table-column prop="order_no" label="订货单号" width="150" />
         <el-table-column prop="customer_name" label="客户" />
         <el-table-column prop="order_date" label="订单日期" width="120" />

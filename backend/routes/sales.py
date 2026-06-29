@@ -30,8 +30,8 @@ def serialize_order(o):
         'remark': o.remark,
         'created_by': o.created_by,
         'created_at': o.created_at.isoformat() if o.created_at else None,
-        'items': [serialize_item(i) for i in o.items],
-        'suppliers': [serialize_supplier(s) for s in o.suppliers],
+        'items': [serialize_item(i) for i in o.items if i.product and i.product.name],
+        'suppliers': [serialize_supplier(s) for s in o.suppliers if s.product],
         'logistics': [serialize_logistics(l) for l in o.logistics]
     }
 
@@ -557,10 +557,13 @@ def upload_sales():
                 continue
 
             supplier_name = cell_str(row, 2)
+            sup_product = cell_str(row, 3)
+            if not sup_product:
+                continue
             sup = SalesOrderSupplier(
                 order_id=order.id,
                 supplier=supplier_name,
-                product=cell_str(row, 3),
+                product=sup_product,
                 spec=cell_str(row, 4),
                 grade=cell_str(row, 5),
                 surface_treatment=cell_str(row, 6),

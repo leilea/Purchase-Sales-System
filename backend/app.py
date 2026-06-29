@@ -121,7 +121,7 @@ if __name__ == '__main__':
     site_pkgs = re.escape(str(Path(sys.base_prefix) / 'Lib' / 'site-packages'))
     run_simple(
         '127.0.0.1', 5000, app,
-        use_reloader=True,
+        use_reloader=False,
         use_debugger=True,
         extra_files=list(extra),
         exclude_patterns=[site_pkgs + re.escape('\\') + '.*'],
