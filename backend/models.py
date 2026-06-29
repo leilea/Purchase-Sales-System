@@ -146,6 +146,8 @@ class SalesOrderItem(db.Model):
     material_grade = db.Column(db.String(100))
     surface_treatment = db.Column(db.String(200))
     matching = db.Column(db.String(100))
+    package_quantity = db.Column(db.Numeric(10, 2), default=0)
+    package_count = db.Column(db.Numeric(10, 2), default=0)
     quantity = db.Column(db.Numeric(10, 2), default=0)
     unit_price = db.Column(db.Numeric(10, 2), default=0)
     amount = db.Column(db.Numeric(10, 2), default=0)

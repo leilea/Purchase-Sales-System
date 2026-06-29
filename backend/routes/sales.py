@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, SalesOrder, SalesOrderItem, SalesOrderSupplier, SalesOrderLogistics, PurchaseOrder, PurchaseOrderItem, Inventory, InventoryLog, Product, Customer, Supplier, Unit
 from datetime import datetime
@@ -79,6 +79,8 @@ def serialize_item(i):
         'material_grade': i.material_grade,
         'surface_treatment': i.surface_treatment,
         'matching': i.matching,
+        'package_quantity': float(i.package_quantity) if i.package_quantity else 0,
+        'package_count': float(i.package_count) if i.package_count else 0,
         'unit_name': i.product.unit.name if i.product and i.product.unit else None,
         'quantity': float(i.quantity) if i.quantity else 0,
         'unit_price': float(i.unit_price) if i.unit_price else 0,
@@ -174,6 +176,8 @@ def create_sale():
             material_grade=item_data.get('material_grade'),
             surface_treatment=item_data.get('surface_treatment'),
             matching=item_data.get('matching'),
+            package_quantity=item_data.get('package_quantity', 0),
+            package_count=item_data.get('package_count', 0),
             quantity=quantity,
             unit_price=unit_price,
             amount=amount,
@@ -275,6 +279,8 @@ def update_sale(id):
                 material_grade=item_data.get('material_grade'),
                 surface_treatment=item_data.get('surface_treatment'),
                 matching=item_data.get('matching'),
+                package_quantity=item_data.get('package_quantity', 0),
+                package_count=item_data.get('package_count', 0),
                 quantity=quantity,
                 unit_price=unit_price,
                 amount=amount,
@@ -425,7 +431,8 @@ def upload_sales():
 
     col_map = {
         'name': 2, 'spec': 3, 'material_grade': 4, 'surface_treatment': 5,
-        'matching': 8, 'unit': 9, 'quantity': 10, 'unit_price': 11, 'remark': 12
+        'package_quantity': 6, 'package_count': 7, 'matching': 8, 'unit': 9,
+        'quantity': 10, 'unit_price': 11, 'remark': 12
     }
 
     order = SalesOrder(
@@ -474,6 +481,8 @@ def upload_sales():
         spec = cell_str(row, col_map['spec'])
         mg = cell_str(row, col_map['material_grade'])
         st = cell_str(row, col_map['surface_treatment'])
+        package_qty = cell_str(row, col_map['package_quantity'])
+        package_cnt = cell_str(row, col_map['package_count'])
         matching = cell_str(row, col_map['matching'])
         unit_name = cell_str(row, col_map['unit'])
 
@@ -523,6 +532,8 @@ def upload_sales():
             material_grade=mg or product.material_grade,
             surface_treatment=st or product.surface_treatment,
             matching=matching,
+            package_quantity=float_safe(ws.cell(row, col_map['package_quantity']).value),
+            package_count=float_safe(ws.cell(row, col_map['package_count']).value),
             quantity=quantity,
             unit_price=unit_price,
             amount=amount,
@@ -743,6 +754,297 @@ def deliver_sale(id):
     db.session.commit()
     
     return jsonify(serialize_order(order))
+
+
+@bp.route('/<int:id>/export', methods=['GET'])
+@jwt_required()
+def export_sale(id):
+    order = SalesOrder.query.get_or_404(id)
+    return _export_sale_excel(order)
+
+
+def _export_sale_excel(order):
+    from io import BytesIO
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, Border, Side, PatternFill, numbers
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = '订货单'
+
+    thin = Side(style='thin')
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    header_font = Font(bold=True, size=10)
+    center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    title_font = Font(bold=True, size=16)
+    section_font = Font(bold=True, size=11)
+
+    ws.merge_cells('A1:O1')
+    ws['A1'] = '订货单'
+    ws['A1'].font = title_font
+    ws['A1'].alignment = center
+
+    customer = order.customer
+    ws.merge_cells('A3:D3')
+    ws['A3'] = f'客户：{customer.name if customer else ""}'
+    ws.merge_cells('E3:I3')
+    ws['E3'] = f'地址：{order.address or ""}'
+    ws.merge_cells('J3:O3')
+    ws['J3'] = '订单日期'
+
+    ws.merge_cells('A4:D4')
+    ws['A4'] = f'联系人：{order.contact_person or ""}'
+    ws.merge_cells('E4:I4')
+    ws['E4'] = f'联系电话：{order.contact_phone or ""}'
+    ws.merge_cells('J4:O4')
+    if order.order_date:
+        ws['J4'] = order.order_date
+        ws['J4'].number_format = 'YYYY-MM-DD'
+        ws['J4'].alignment = Alignment(horizontal='left')
+
+    ws.merge_cells('A5:D5')
+    ws['A5'] = f'付款方式：{order.payment_method or ""}'
+    ws.merge_cells('E5:I5')
+    inv = f'发票：{"需要" if order.invoice_required else "不需要"}'
+    if order.invoice_tax_rate:
+        inv += f'（{order.invoice_tax_rate}）'
+    ws['E5'] = inv
+    ws.merge_cells('J5:O5')
+    ws['J5'] = f'运费：{order.freight_responsible or ""}'
+
+    ws.merge_cells('A6:O6')
+    ws['A6'] = f'业务负责人：{order.business_manager or ""}'
+
+    ws.merge_cells('A7:O7')
+    ws['A7'] = f'备注：{order.remark or ""}'
+
+    # === Products section ===
+    prod_title_row = 9
+    ws.merge_cells(start_row=prod_title_row, start_column=1, end_row=prod_title_row, end_column=15)
+    ws.cell(prod_title_row, 1, '订单信息：').font = section_font
+
+    prod_header_row = prod_title_row + 1
+    prod_headers = ['序号', '产品名称', '规格', '材质等级', '表面处理', '配套', '', '配套', '单位', '数量', '单价', '金额', '备注']
+    for ci, h in enumerate(prod_headers):
+        c = ws.cell(prod_header_row, ci + 1, h)
+        c.font = header_font
+        c.alignment = center
+        c.border = border
+
+    items = list(order.items)
+    for i, item in enumerate(items):
+        r = prod_header_row + 1 + i
+        prod = item.product
+        ws.cell(r, 1, i + 1).border = border
+        ws.cell(r, 2, prod.name if prod else '').border = border
+        ws.cell(r, 3, item.spec or '').border = border
+        ws.cell(r, 4, item.material_grade or '').border = border
+        ws.cell(r, 5, item.surface_treatment or '').border = border
+        c_pq = ws.cell(r, 6, float(item.package_quantity))
+        c_pq.border = border
+        c_pq.number_format = '#,##0.00'
+        c_pc = ws.cell(r, 7, float(item.package_count))
+        c_pc.border = border
+        c_pc.number_format = '#,##0.00'
+        ws.cell(r, 8, item.matching or '').border = border
+        ws.cell(r, 9, prod.unit.name if prod and prod.unit else '').border = border
+        c_qty = ws.cell(r, 10, float(item.quantity))
+        c_qty.border = border
+        c_qty.number_format = '#,##0.00'
+        c_price = ws.cell(r, 11, float(item.unit_price))
+        c_price.border = border
+        c_price.number_format = '#,##0.00'
+        c_amt = ws.cell(r, 12, float(item.amount))
+        c_amt.border = border
+        c_amt.number_format = '#,##0.00'
+        ws.cell(r, 13, item.remark or '').border = border
+
+    # === Suppliers section ===
+    sup_start = prod_header_row + 1 + len(items) + 1
+    ws.merge_cells(start_row=sup_start, start_column=1, end_row=sup_start, end_column=3)
+    ws.cell(sup_start, 1, '供应商/委外加工信息：').font = section_font
+
+    sup_header_row = sup_start + 1
+    sup_headers = ['序号', '供应商', '供应产品', '规格', '等级', '表面处理', '数量', '总重', '单重', '价格', '包装', '税费', '成本小计']
+    for ci, h in enumerate(sup_headers):
+        c = ws.cell(sup_header_row, ci + 1, h)
+        c.font = header_font
+        c.alignment = center
+        c.border = border
+
+    suppliers = list(order.suppliers)
+    for i, sup in enumerate(suppliers):
+        r = sup_header_row + 1 + i
+        ws.cell(r, 1, i + 1).border = border
+        ws.cell(r, 2, sup.supplier or '').border = border
+        ws.cell(r, 3, sup.product or '').border = border
+        ws.cell(r, 4, sup.spec or '').border = border
+        ws.cell(r, 5, sup.grade or '').border = border
+        ws.cell(r, 6, sup.surface_treatment or '').border = border
+        ws.cell(r, 7, float(sup.quantity)).border = border
+        ws.cell(r, 8, float(sup.total_weight)).border = border
+        ws.cell(r, 9, float(sup.unit_weight)).border = border
+        c_price = ws.cell(r, 10, float(sup.price))
+        c_price.border = border
+        c_price.number_format = '#,##0.00'
+        ws.cell(r, 11, sup.packaging or '').border = border
+        c_tax = ws.cell(r, 12, float(sup.tax))
+        c_tax.border = border
+        c_tax.number_format = '#,##0.00'
+        c_cost = ws.cell(r, 13, float(sup.price or 0) * float(sup.quantity or 0) + float(sup.tax or 0))
+        c_cost.border = border
+        c_cost.number_format = '#,##0.00'
+
+    # === Logistics section ===
+    log_start = sup_header_row + 1 + len(suppliers) + 1
+    ws.merge_cells(start_row=log_start, start_column=1, end_row=log_start, end_column=3)
+    ws.cell(log_start, 1, '物流信息：').font = section_font
+
+    log_header_row = log_start + 1
+    log_headers = ['序号', '物流公司', '联系人', '电话', '开始时间', '完成时间', '运输情况', '', '', '运费', '包装费', '备注']
+    for ci, h in enumerate(log_headers):
+        c = ws.cell(log_header_row, ci + 1, h)
+        c.font = header_font
+        c.alignment = center
+        c.border = border
+
+    logistics = list(order.logistics)
+    for i, log_item in enumerate(logistics):
+        r = log_header_row + 1 + i
+        ws.cell(r, 1, i + 1).border = border
+        ws.cell(r, 2, log_item.company or '').border = border
+        ws.cell(r, 3, log_item.contact_person or '').border = border
+        ws.cell(r, 4, log_item.contact_phone or '').border = border
+        if log_item.start_time:
+            ws.cell(r, 5, log_item.start_time).border = border
+        if log_item.end_time:
+            ws.cell(r, 6, log_item.end_time).border = border
+        ws.cell(r, 7, log_item.transport_status or '').border = border
+        c_freight = ws.cell(r, 10, float(log_item.freight))
+        c_freight.border = border
+        c_freight.number_format = '#,##0.00'
+        c_fork = ws.cell(r, 11, float(log_item.forklift_fee))
+        c_fork.border = border
+        c_fork.number_format = '#,##0.00'
+        ws.cell(r, 12, log_item.remark or '').border = border
+
+    # Footer row (3 fields with spacing)
+    data_last_row = ws.max_row
+    footer_row = data_last_row + 3
+    ws.merge_cells(start_row=footer_row, start_column=1, end_row=footer_row, end_column=3)
+    ws.cell(footer_row, 1, '录入CRM：').font = Font(bold=True, size=10)
+    ws.merge_cells(start_row=footer_row, start_column=4, end_row=footer_row, end_column=7)
+    ws.cell(footer_row, 4, '订单审核：').font = Font(bold=True, size=10)
+    ws.merge_cells(start_row=footer_row, start_column=8, end_row=footer_row, end_column=12)
+    ws.cell(footer_row, 8, '发货日期：').font = Font(bold=True, size=10)
+
+    gray_fill = PatternFill(start_color='D9D9D9', end_color='D9D9D9', fill_type='solid')
+    end_row = data_last_row + 50
+    end_col = 30
+    # Columns O(15) right side → gray for all rows up to the footer row
+    for r in range(1, footer_row + 1):
+        for c in range(16, end_col + 1):
+            ws.cell(r, c).fill = gray_fill
+    # Rows below footer → gray for all columns
+    for r in range(footer_row + 1, end_row + 1):
+        for c in range(1, end_col + 1):
+            ws.cell(r, c).fill = gray_fill
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    response = send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                         as_attachment=True, download_name=f'订货单_{order.order_no}.xlsx')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+
+@bp.route('/<int:id>/copy', methods=['POST'])
+@jwt_required()
+def copy_sale(id):
+    user_id = int(get_jwt_identity())
+    original = SalesOrder.query.get_or_404(id)
+    if original.status != 'delivered':
+        return jsonify({'error': 'Only delivered orders can be copied'}), 400
+
+    new_order_no = f"SO{datetime.now().strftime('%Y%m%d')}{uuid.uuid4().hex[:6].upper()}"
+
+    new_order = SalesOrder(
+        order_no=new_order_no,
+        customer_id=original.customer_id,
+        contact_person=original.contact_person,
+        contact_phone=original.contact_phone,
+        business_manager=original.business_manager,
+        business_manager_phone=original.business_manager_phone,
+        address=original.address,
+        freight_responsible=original.freight_responsible,
+        freight=original.freight,
+        payment_method=original.payment_method,
+        invoice_required=original.invoice_required,
+        invoice_tax_rate=original.invoice_tax_rate,
+        order_date=original.order_date,
+        total_amount=original.total_amount,
+        gross_profit=original.gross_profit,
+        status='draft',
+        remark=original.remark,
+        created_by=user_id
+    )
+    db.session.add(new_order)
+    db.session.flush()
+
+    for item in original.items:
+        new_item = SalesOrderItem(
+            order_id=new_order.id,
+            product_id=item.product_id,
+            spec=item.spec,
+            material_grade=item.material_grade,
+            surface_treatment=item.surface_treatment,
+            matching=item.matching,
+            quantity=item.quantity,
+            unit_price=item.unit_price,
+            amount=item.amount,
+            remark=item.remark
+        )
+        db.session.add(new_item)
+
+    for sup in original.suppliers:
+        new_sup = SalesOrderSupplier(
+            order_id=new_order.id,
+            supplier=sup.supplier,
+            product=sup.product,
+            spec=sup.spec,
+            grade=sup.grade,
+            surface_treatment=sup.surface_treatment,
+            quantity=sup.quantity,
+            total_weight=sup.total_weight,
+            unit_weight=sup.unit_weight,
+            price=sup.price,
+            packaging=sup.packaging,
+            tax=sup.tax
+        )
+        db.session.add(new_sup)
+
+    for log in original.logistics:
+        new_log = SalesOrderLogistics(
+            order_id=new_order.id,
+            company=log.company,
+            contact_person=log.contact_person,
+            contact_phone=log.contact_phone,
+            start_time=log.start_time,
+            end_time=log.end_time,
+            transport_status=log.transport_status,
+            freight=log.freight,
+            forklift_fee=log.forklift_fee,
+            other_fee=log.other_fee,
+            remark=log.remark
+        )
+        db.session.add(new_log)
+
+    db.session.commit()
+
+    return jsonify(serialize_order(new_order)), 201
 
 
 @bp.route('/<int:id>', methods=['DELETE'])

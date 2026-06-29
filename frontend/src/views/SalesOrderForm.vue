@@ -142,6 +142,16 @@
                     <el-input v-model="row.surface_treatment" size="small" />
                   </template>
                 </el-table-column>
+                <el-table-column label="件装数量" min-width="120">
+                  <template #default="{ row }">
+                    <el-input v-model="row.package_quantity" maxlength="20" size="small" />
+                  </template>
+                </el-table-column>
+                <el-table-column label="件数" min-width="100">
+                  <template #default="{ row }">
+                    <el-input v-model="row.package_count" maxlength="20" size="small" />
+                  </template>
+                </el-table-column>
                 <el-table-column label="配套" min-width="100">
                   <template #default="{ row }">
                     <el-input v-model="row.matching" size="small" />
@@ -475,7 +485,7 @@ const deleteSupplier = (idx) => {
 }
 
 const addItem = () => {
-  form.items.push({ product_id: null, spec: '', material_grade: '', surface_treatment: '', matching: '', unit_name: '', quantity: 1, unit_price: 0, amount: 0, remark: '' })
+  form.items.push({ product_id: null, spec: '', material_grade: '', surface_treatment: '', package_quantity: 0, package_count: 0, matching: '', unit_name: '', quantity: 1, unit_price: 0, amount: 0, remark: '' })
   itemPage.value = Math.ceil(form.items.length / pageSize)
 }
 

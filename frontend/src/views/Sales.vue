@@ -4,6 +4,8 @@
       <h2>销售管理</h2>
       <div>
         <input ref="fileInput" type="file" accept=".xls,.xlsx" style="display:none" @change="handleFileUpload" />
+        <el-button type="warning" @click="handleExport" :disabled="selectedRows.length !== 1">导出</el-button>
+        <el-button type="warning" @click="handleCopy" :disabled="selectedRows.length !== 1">复制</el-button>
         <el-button type="success" @click="$refs.fileInput.click()">导入订货单</el-button>
         <el-button type="primary" @click="handleAdd">新建订货单</el-button>
       </div>
@@ -26,7 +28,8 @@
       </el-form>
     </el-card>
     <el-card>
-      <el-table :data="tableData" v-loading="loading" stripe>
+      <el-table ref="tableRef" :data="tableData" v-loading="loading" stripe @selection-change="handleSelectionChange" @select="handleSelect">
+        <el-table-column type="selection" width="55" :selectable="(row) => row.status === 'delivered'" />
         <el-table-column type="index" label="序号" width="60" />
         <el-table-column prop="order_no" label="订货单号" width="150" />
         <el-table-column prop="customer_name" label="客户" />
@@ -71,14 +74,16 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getSales, deleteSale, deliverSale, uploadSale } from '../api/modules/sales'
+import { getSales, deleteSale, deliverSale, uploadSale, copySale, exportSale } from '../api/modules/sales'
 
 const router = useRouter()
 const loading = ref(false)
 const tableData = ref([])
+const selectedRows = ref([])
 const pagination = reactive({ page: 1, pageSize: 10, total: 0 })
 const filters = reactive({ order_no: '', customer_name: '', dateRange: null })
 
+const tableRef = ref()
 const fileInput = ref()
 
 const getStatusType = (status) => {
@@ -161,6 +166,44 @@ const handleDeliver = async (row) => {
     loadData()
   } catch (e) {
     console.error(e)
+  }
+}
+
+const handleSelect = (selection, row) => {
+  if (selection.some(r => r.id === row.id) && selection.length > 1) {
+    const toRemove = selection.filter(r => r.id !== row.id)
+    toRemove.forEach(r => tableRef.value.toggleRowSelection(r, false))
+  }
+}
+
+const handleSelectionChange = (rows) => {
+  selectedRows.value = rows
+}
+
+const handleExport = async () => {
+  if (selectedRows.value.length !== 1) return
+  try {
+    const res = await exportSale(selectedRows.value[0].id)
+    const url = window.URL.createObjectURL(new Blob([res.data]))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `订货单_${selectedRows.value[0].order_no}.xlsx`
+    a.click()
+    window.URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error('导出失败')
+  }
+}
+
+const handleCopy = async () => {
+  if (selectedRows.value.length !== 1) return
+  await ElMessageBox.confirm('确定复制该订货单吗？', '提示', { type: 'info' })
+  try {
+    await copySale(selectedRows.value[0].id)
+    ElMessage.success('复制成功')
+    loadData()
+  } catch (e) {
+    ElMessage.error('复制失败')
   }
 }
 

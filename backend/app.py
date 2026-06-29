@@ -79,7 +79,7 @@ def _migrate_db():
             db.session.execute(text(f'ALTER TABLE sales_orders ADD COLUMN {col} {typ}'))
     
     # SalesOrderItem new columns
-    for col, typ in [('spec', 'VARCHAR(200)'), ('material_grade', 'VARCHAR(100)'), ('surface_treatment', 'VARCHAR(200)'), ('matching', 'VARCHAR(100)'), ('remark', 'TEXT')]:
+    for col, typ in [('spec', 'VARCHAR(200)'), ('material_grade', 'VARCHAR(100)'), ('surface_treatment', 'VARCHAR(200)'), ('matching', 'VARCHAR(100)'), ('package_quantity', 'NUMERIC(10,2) DEFAULT 0'), ('package_count', 'NUMERIC(10,2) DEFAULT 0'), ('remark', 'TEXT')]:
         if col not in [c['name'] for c in inspector.get_columns('sales_order_items')]:
             db.session.execute(text(f'ALTER TABLE sales_order_items ADD COLUMN {col} {typ}'))
     
