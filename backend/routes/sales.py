@@ -138,7 +138,7 @@ def create_sale():
     user_id = int(get_jwt_identity())
     data = request.get_json()
     
-    order_no = f"SO{datetime.now().strftime('%Y%m%d')}{uuid.uuid4().hex[:6].upper()}"
+    order_no = f"SO{datetime.now().strftime('%y%m%d')}{uuid.uuid4().hex[:6].upper()}"
     
     order = SalesOrder(
         order_no=order_no,
@@ -420,7 +420,7 @@ def upload_sales():
         customer = Customer.query.filter(Customer.name.like(f'%{customer_name}%')).first()
     if not customer:
         customer = Customer(
-            code=f'IMP{datetime.now().strftime("%Y%m%d%H%M%S")}',
+            code=f'IMP{datetime.now().strftime("%y%m%d%H%M%S")}',
             name=customer_name or '导入客户',
             contact=contact_person,
             phone=phone or '',
@@ -436,7 +436,7 @@ def upload_sales():
     }
 
     order = SalesOrder(
-        order_no=f"SO{datetime.now().strftime('%Y%m%d')}{uuid.uuid4().hex[:6].upper()}",
+        order_no=f"SO{datetime.now().strftime('%y%m%d')}{uuid.uuid4().hex[:6].upper()}",
         customer_id=customer.id,
         contact_person=contact_person,
         contact_phone=phone or '',
@@ -512,7 +512,7 @@ def upload_sales():
                     db.session.flush()
 
             product = Product(
-                code=f'IMP{datetime.now().strftime("%Y%m%d%H%M%S")}{uuid.uuid4().hex[:4].upper()}',
+                code=f'IMP{datetime.now().strftime("%y%m%d%H%M%S")}{uuid.uuid4().hex[:2].upper()}',
                 name=product_name,
                 spec=spec,
                 material_grade=mg,
@@ -671,7 +671,7 @@ def deliver_sale(id):
         db.session.add(log)
     
     if order.customer and not Customer.query.filter(Customer.name == order.customer.name).first():
-        code = f'IMP{datetime.now().strftime("%Y%m%d%H%M%S")}{uuid.uuid4().hex[:4].upper()}'
+        code = f'IMP{datetime.now().strftime("%y%m%d%H%M%S")}{uuid.uuid4().hex[:2].upper()}'
         db.session.add(Customer(
             code=code,
             name=order.customer.name,
@@ -680,24 +680,45 @@ def deliver_sale(id):
             address=order.address or ''
         ))
 
-    seen_suppliers = set()
+    # Build supplier name → supplier_id mapping, creating Supplier records as needed
+    from collections import OrderedDict
+    sup_name_to_id = {}
+    supplier_names = []
     for sup in order.suppliers:
-        name = sup.supplier
-        if name and name not in seen_suppliers:
-            seen_suppliers.add(name)
-            if not Supplier.query.filter(Supplier.name == name).first():
-                code = f'IMP{datetime.now().strftime("%Y%m%d%H%M%S")}{uuid.uuid4().hex[:4].upper()}'
-                db.session.add(Supplier(name=name, code=code, contact='', phone=''))
+        raw = sup.supplier or ''
+        name = raw.strip()
+        supplier_names.append(repr(name))
+        if not name or name in sup_name_to_id:
+            continue
+        s = Supplier.query.filter(Supplier.name == name).first()
+        if not s:
+            code = f'IMP{datetime.now().strftime("%y%m%d%H%M%S")}{uuid.uuid4().hex[:2].upper()}'
+            s = Supplier(name=name, code=code, contact='', phone='')
+            db.session.add(s)
+            db.session.flush()
+        sup_name_to_id[name] = s.id
 
     db.session.flush()
+    print(f'[DEBUG deliver] supplier names: {supplier_names}')
+    print(f'[DEBUG deliver] name→id map: {sup_name_to_id}')
 
-    po_index = 0
+    # Group supplier records by supplier_id → one purchase order per supplier
+    sup_groups = OrderedDict()
     for sup in order.suppliers:
-        name = sup.supplier
+        name = sup.supplier.strip() if sup.supplier else ''
         if not name:
             continue
+        sid = sup_name_to_id.get(name)
+        if sid is None:
+            print(f'[DEBUG deliver] WARNING: supplier name "{repr(name)}" not found in map!')
+            continue
+        sup_groups.setdefault(sid, []).append(sup)
 
-        supplier = Supplier.query.filter(Supplier.name == name).first()
+    print(f'[DEBUG deliver] groups (by supplier_id): {list((k, len(v)) for k, v in sup_groups.items())}')
+
+    po_index = 0
+    for sid, sups in sup_groups.items():
+        supplier = Supplier.query.get(sid)
         if not supplier:
             continue
 
@@ -716,39 +737,47 @@ def deliver_sale(id):
         db.session.add(po)
         db.session.flush()
 
-        total_amount = 0
-        product = None
-        if sup.product:
-            product = Product.query.filter(Product.name.like(f'%{sup.product}%')).first()
-        if not product and sup.product:
-            product = Product(
-                code=f'IMP{datetime.now().strftime("%Y%m%d%H%M%S")}{uuid.uuid4().hex[:4].upper()}',
-                name=sup.product,
-                spec=sup.spec or '',
-                material_grade=sup.grade or '',
-                surface_treatment=sup.surface_treatment or '',
-                cost_price=float(sup.price) if sup.price else 0,
-                sale_price=0,
-                status=1
-            )
-            db.session.add(product)
-            db.session.flush()
-        if product:
-            quantity = float(sup.quantity) if sup.quantity else 0
-            unit_price = float(sup.price) if sup.price else 0
-            amount = quantity * unit_price
+        po_total = 0
+        for sup in sups:
+            product = None
+            if sup.product:
+                product = Product.query.filter(Product.name.like(f'%{sup.product}%')).first()
+            if not product and sup.product:
+                product = Product(
+                    code=f'IMP{datetime.now().strftime("%y%m%d%H%M%S")}{uuid.uuid4().hex[:2].upper()}',
+                    name=sup.product,
+                    spec=sup.spec or '',
+                    material_grade=sup.grade or '',
+                    surface_treatment=sup.surface_treatment or '',
+                    cost_price=float(sup.price) if sup.price else 0,
+                    sale_price=0,
+                    status=1
+                )
+                db.session.add(product)
+                db.session.flush()
+            if product:
+                quantity = float(sup.quantity) if sup.quantity else 0
+                unit_price = float(sup.price) if sup.price else 0
+                amount = quantity * unit_price
 
-            po_item = PurchaseOrderItem(
-                order_id=po.id,
-                product_id=product.id,
-                quantity=quantity,
-                unit_price=unit_price,
-                amount=amount
-            )
-            db.session.add(po_item)
-            total_amount = amount
+                po_item = PurchaseOrderItem(
+                    order_id=po.id,
+                    product_id=product.id,
+                    spec=sup.spec or '',
+                    grade=sup.grade or '',
+                    surface_treatment=sup.surface_treatment or '',
+                    quantity=quantity,
+                    unit_price=unit_price,
+                    amount=amount,
+                    total_weight=float(sup.total_weight) if sup.total_weight else 0,
+                    unit_weight=float(sup.unit_weight) if sup.unit_weight else 0,
+                    packaging=sup.packaging or '',
+                    tax=float(sup.tax) if sup.tax else 0
+                )
+                db.session.add(po_item)
+                po_total += amount
 
-        po.total_amount = total_amount
+        po.total_amount = po_total
 
     order.status = 'delivered'
     db.session.commit()
@@ -969,7 +998,7 @@ def copy_sale(id):
     if original.status != 'delivered':
         return jsonify({'error': 'Only delivered orders can be copied'}), 400
 
-    new_order_no = f"SO{datetime.now().strftime('%Y%m%d')}{uuid.uuid4().hex[:6].upper()}"
+    new_order_no = f"SO{datetime.now().strftime('%y%m%d')}{uuid.uuid4().hex[:6].upper()}"
 
     new_order = SalesOrder(
         order_no=new_order_no,

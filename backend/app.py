@@ -83,6 +83,11 @@ def _migrate_db():
         if col not in [c['name'] for c in inspector.get_columns('sales_order_items')]:
             db.session.execute(text(f'ALTER TABLE sales_order_items ADD COLUMN {col} {typ}'))
     
+    # PurchaseOrderItem new columns
+    for col, typ in [('spec', 'VARCHAR(200)'), ('grade', 'VARCHAR(100)'), ('surface_treatment', 'VARCHAR(200)'), ('total_weight', 'NUMERIC(10,3) DEFAULT 0'), ('unit_weight', 'NUMERIC(10,4) DEFAULT 0'), ('packaging', 'VARCHAR(200)'), ('tax', 'NUMERIC(10,2) DEFAULT 0')]:
+        if col not in [c['name'] for c in inspector.get_columns('purchase_order_items')]:
+            db.session.execute(text(f'ALTER TABLE purchase_order_items ADD COLUMN {col} {typ}'))
+
     # Create new tables if not exist
     for table_name in ['sales_order_suppliers', 'sales_order_logistics']:
         if table_name not in inspector.get_table_names():
@@ -121,7 +126,7 @@ if __name__ == '__main__':
     site_pkgs = re.escape(str(Path(sys.base_prefix) / 'Lib' / 'site-packages'))
     run_simple(
         '127.0.0.1', 5000, app,
-        use_reloader=False,
+        use_reloader=True,
         use_debugger=True,
         extra_files=list(extra),
         exclude_patterns=[site_pkgs + re.escape('\\') + '.*'],

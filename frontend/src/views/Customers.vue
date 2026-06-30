@@ -24,7 +24,7 @@
     <el-card style="width: 100%">
       <el-table :data="tableData" v-loading="loading" stripe style="width: 100%">
         <el-table-column type="index" label="序号" width="60" />
-        <el-table-column prop="code" label="编码" width="120" />
+        <el-table-column prop="code" label="客户编码" width="120" />
         <el-table-column prop="name" label="客户名称" min-width="130" />
         <el-table-column prop="level" label="等级" width="80" />
         <el-table-column prop="contact" label="联系人" min-width="90" />

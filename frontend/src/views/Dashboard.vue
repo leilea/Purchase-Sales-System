@@ -139,7 +139,7 @@ function updateChart() {
     yAxis: {
       type: 'value',
       axisLabel: {
-        formatter: (v) => '¥' + (v >= 10000 ? (v / 10000).toFixed(0) + 'w' : v)
+        formatter: (v) => '¥' + (v >= 10000 ? (v / 10000).toFixed(1).replace(/\.0$/, '') + 'w' : v)
       }
     },
     series: [

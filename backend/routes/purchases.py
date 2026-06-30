@@ -29,9 +29,16 @@ def serialize_item(i):
         'product_id': i.product_id,
         'product_name': i.product.name if i.product else None,
         'product_code': i.product.code if i.product else None,
+        'spec': i.spec or '',
+        'grade': i.grade or '',
+        'surface_treatment': i.surface_treatment or '',
         'quantity': float(i.quantity) if i.quantity else 0,
         'unit_price': float(i.unit_price) if i.unit_price else 0,
-        'amount': float(i.amount) if i.amount else 0
+        'amount': float(i.amount) if i.amount else 0,
+        'total_weight': float(i.total_weight) if i.total_weight else 0,
+        'unit_weight': float(i.unit_weight) if i.unit_weight else 0,
+        'packaging': i.packaging or '',
+        'tax': float(i.tax) if i.tax else 0
     }
 
 
@@ -84,7 +91,7 @@ def create_purchase():
     user_id = int(get_jwt_identity())
     data = request.get_json()
     
-    order_no = f"PO{datetime.now().strftime('%Y%m%d')}{uuid.uuid4().hex[:6].upper()}"
+    order_no = f"PO{datetime.now().strftime('%y%m%d')}{uuid.uuid4().hex[:6].upper()}"
     
     order = PurchaseOrder(
         order_no=order_no,
@@ -107,9 +114,16 @@ def create_purchase():
         item = PurchaseOrderItem(
             order_id=order.id,
             product_id=item_data.get('product_id'),
+            spec=item_data.get('spec', ''),
+            grade=item_data.get('grade', ''),
+            surface_treatment=item_data.get('surface_treatment', ''),
             quantity=quantity,
             unit_price=unit_price,
-            amount=amount
+            amount=amount,
+            total_weight=float(item_data.get('total_weight', 0)),
+            unit_weight=float(item_data.get('unit_weight', 0)),
+            packaging=item_data.get('packaging', ''),
+            tax=float(item_data.get('tax', 0))
         )
         db.session.add(item)
         total_amount += amount
@@ -147,9 +161,16 @@ def update_purchase(id):
             item = PurchaseOrderItem(
                 order_id=order.id,
                 product_id=item_data.get('product_id'),
+                spec=item_data.get('spec', ''),
+                grade=item_data.get('grade', ''),
+                surface_treatment=item_data.get('surface_treatment', ''),
                 quantity=quantity,
                 unit_price=unit_price,
-                amount=amount
+                amount=amount,
+                total_weight=float(item_data.get('total_weight', 0)),
+                unit_weight=float(item_data.get('unit_weight', 0)),
+                packaging=item_data.get('packaging', ''),
+                tax=float(item_data.get('tax', 0))
             )
             db.session.add(item)
             total_amount += amount

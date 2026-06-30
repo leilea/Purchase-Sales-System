@@ -6,7 +6,7 @@
     </div>
     <el-card>
       <el-form :inline="true" @keyup.enter="loadData" style="margin-bottom: 16px">
-        <el-form-item label="订单号">
+        <el-form-item label="采购单号">
           <el-input v-model="search.order_no" placeholder="请输入" clearable @clear="loadData" />
         </el-form-item>
         <el-form-item label="供应商">
@@ -24,7 +24,7 @@
       </el-form>
       <el-table :data="tableData" v-loading="loading" stripe>
         <el-table-column type="index" label="序号" width="60" />
-        <el-table-column prop="order_no" label="订单号" width="150" />
+        <el-table-column prop="order_no" label="采购单号" width="150" />
         <el-table-column prop="supplier_name" label="供应商" />
         <el-table-column prop="order_date" label="订单日期" width="120" />
         <el-table-column prop="total_amount" label="总金额" width="120" />
@@ -67,30 +67,65 @@
           <el-input v-model="form.remark" type="textarea" />
         </el-form-item>
         <el-form-item label="商品明细">
-          <el-table :data="form.items" border size="small">
-            <el-table-column label="商品" width="200">
+          <el-table :data="form.items" border size="small" max-height="400">
+            <el-table-column label="商品" width="160">
               <template #default="{ row, $index }">
                 <el-select v-model="row.product_id" placeholder="选择商品" @change="onProductChange($index)">
                   <el-option v-for="p in products" :key="p.id" :label="p.name" :value="p.id" />
                 </el-select>
               </template>
             </el-table-column>
-            <el-table-column label="数量" width="120">
+            <el-table-column label="规格" width="100">
+              <template #default="{ row }">
+                <el-input v-model="row.spec" size="small" />
+              </template>
+            </el-table-column>
+            <el-table-column label="等级" width="80">
+              <template #default="{ row }">
+                <el-input v-model="row.grade" size="small" />
+              </template>
+            </el-table-column>
+            <el-table-column label="表面处理" width="100">
+              <template #default="{ row }">
+                <el-input v-model="row.surface_treatment" size="small" />
+              </template>
+            </el-table-column>
+            <el-table-column label="数量" width="90">
               <template #default="{ row }">
                 <el-input-number v-model="row.quantity" :min="1" :precision="2" size="small" @change="calcAmount(row)" />
               </template>
             </el-table-column>
-            <el-table-column label="单价" width="120">
+            <el-table-column label="总重" width="90">
+              <template #default="{ row }">
+                <el-input-number v-model="row.total_weight" :min="0" :precision="3" size="small" />
+              </template>
+            </el-table-column>
+            <el-table-column label="单重" width="90">
+              <template #default="{ row }">
+                <el-input-number v-model="row.unit_weight" :min="0" :precision="4" size="small" />
+              </template>
+            </el-table-column>
+            <el-table-column label="单价" width="90">
               <template #default="{ row }">
                 <el-input-number v-model="row.unit_price" :min="0" :precision="2" size="small" @change="calcAmount(row)" />
               </template>
             </el-table-column>
-            <el-table-column label="金额">
+            <el-table-column label="包装" width="100">
+              <template #default="{ row }">
+                <el-input v-model="row.packaging" size="small" />
+              </template>
+            </el-table-column>
+            <el-table-column label="税费" width="90">
+              <template #default="{ row }">
+                <el-input-number v-model="row.tax" :min="0" :precision="2" size="small" @change="calcAmount(row)" />
+              </template>
+            </el-table-column>
+            <el-table-column label="金额" width="90">
               <template #default="{ row }">
                 {{ row.amount?.toFixed(2) }}
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="60">
+            <el-table-column label="操作" width="55">
               <template #default="{ $index }">
                 <el-button type="danger" size="small" @click="form.items.splice($index, 1)">删除</el-button>
               </template>
@@ -241,7 +276,7 @@ const handleReceive = async (row) => {
 }
 
 const addItem = () => {
-  form.items.push({ product_id: null, quantity: 1, unit_price: 0, amount: 0 })
+  form.items.push({ product_id: null, spec: '', grade: '', surface_treatment: '', quantity: 1, unit_price: 0, amount: 0, total_weight: 0, unit_weight: 0, packaging: '', tax: 0 })
 }
 
 const onProductChange = (index) => {

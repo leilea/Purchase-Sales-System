@@ -7,7 +7,7 @@
     <el-card>
       <el-table :data="tableData" v-loading="loading" stripe>
         <el-table-column type="index" label="序号" width="60" />
-        <el-table-column prop="code" label="编码" width="120" />
+        <el-table-column prop="code" label="供应商编码" width="120" />
         <el-table-column prop="name" label="供应商名称" />
         <el-table-column prop="contact" label="联系人" width="100" />
         <el-table-column prop="phone" label="电话" width="150" />

@@ -104,9 +104,16 @@ class PurchaseOrderItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey('purchase_orders.id'))
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'))
+    spec = db.Column(db.String(200))
+    grade = db.Column(db.String(100))
+    surface_treatment = db.Column(db.String(200))
     quantity = db.Column(db.Numeric(10, 2), default=0)
     unit_price = db.Column(db.Numeric(10, 2), default=0)
     amount = db.Column(db.Numeric(10, 2), default=0)
+    total_weight = db.Column(db.Numeric(10, 3), default=0)
+    unit_weight = db.Column(db.Numeric(10, 4), default=0)
+    packaging = db.Column(db.String(200))
+    tax = db.Column(db.Numeric(10, 2), default=0)
 
 
 class SalesOrder(db.Model):

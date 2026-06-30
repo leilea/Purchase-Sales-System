@@ -8,7 +8,7 @@ bp = Blueprint('customers', __name__)
 
 def generate_customer_code():
     today = date.today()
-    prefix = today.strftime('%Y%m%d')
+    prefix = today.strftime('%y%m%d')
     last = Customer.query.filter(
         Customer.code.like(f'{prefix}%')
     ).order_by(Customer.code.desc()).first()
