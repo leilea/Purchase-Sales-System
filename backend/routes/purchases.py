@@ -223,13 +223,41 @@ def receive_purchase(id):
 def cancel_purchase(id):
     order = PurchaseOrder.query.get_or_404(id)
     
-    if order.status == 'received':
-        return jsonify({'error': 'Received order cannot be cancelled'}), 400
-    
     if order.status == 'cancelled':
         return jsonify({'error': 'Order already cancelled'}), 400
     
     order.status = 'cancelled'
+    db.session.commit()
+    
+    return jsonify(serialize_order(order))
+
+
+@bp.route('/<int:id>/withdraw', methods=['POST'])
+@jwt_required()
+def withdraw_purchase(id):
+    order = PurchaseOrder.query.get_or_404(id)
+    
+    if order.status != 'received':
+        return jsonify({'error': 'Only received orders can be withdrawn'}), 400
+    
+    for item in order.items:
+        product = Product.query.get(item.product_id)
+        if not product:
+            continue
+        
+        inventory = Inventory.query.filter_by(product_id=item.product_id).first()
+        if inventory:
+            inventory.quantity -= item.quantity
+        
+        log = InventoryLog(
+            product_id=item.product_id,
+            change_type='withdraw',
+            quantity=-item.quantity,
+            order_no=order.order_no
+        )
+        db.session.add(log)
+    
+    order.status = 'draft'
     db.session.commit()
     
     return jsonify(serialize_order(order))

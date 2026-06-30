@@ -13,6 +13,7 @@ def serialize_supplier(s):
         'contact': s.contact,
         'phone': s.phone,
         'address': s.address,
+        'main_business': s.main_business,
         'status': s.status,
         'created_at': s.created_at.isoformat() if s.created_at else None
     }
@@ -66,6 +67,7 @@ def create_supplier():
         contact=data.get('contact'),
         phone=data.get('phone'),
         address=data.get('address'),
+        main_business=data.get('main_business'),
         status=data.get('status', 1)
     )
     db.session.add(supplier)
@@ -93,6 +95,8 @@ def update_supplier(id):
         supplier.phone = data['phone']
     if 'address' in data:
         supplier.address = data['address']
+    if 'main_business' in data:
+        supplier.main_business = data['main_business']
     if 'status' in data:
         supplier.status = data['status']
     

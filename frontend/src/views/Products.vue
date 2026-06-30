@@ -5,11 +5,14 @@
       <el-button type="primary" @click="handleAdd">新增商品</el-button>
     </div>
     <el-card>
-      <el-table :data="tableData" v-loading="loading" stripe>
-        <el-table-column prop="code" label="商品编码" width="120" />
-        <el-table-column prop="name" label="商品名称" />
+      <el-table :data="tableData" v-loading="loading" stripe border>
+        <el-table-column prop="code" label="商品编码" width="180" />
+        <el-table-column prop="name" label="商品名称" min-width="160" align="center" />
+        <el-table-column prop="spec" label="规格型号" width="120" />
+        <el-table-column prop="material_grade" label="材质等级" width="100" />
+        <el-table-column prop="surface_treatment" label="表面处理" width="120" />
+        <el-table-column prop="unit_name" width="110" label="计量单位" />
         <el-table-column prop="category_name" label="分类" width="100" />
-        <el-table-column prop="unit_name" width="80" label="单位" />
         <el-table-column prop="cost_price" label="成本价" width="100" />
         <el-table-column prop="sale_price" label="销售价" width="100" />
         <el-table-column prop="stock" label="库存" width="80" />

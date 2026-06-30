@@ -120,11 +120,12 @@
             <div style="overflow-x: auto">
               <el-table :data="displayItems" border size="small" style="width: 100%">
                 <el-table-column label="序号" min-width="50" type="index" />
-                <el-table-column label="产品名称" min-width="160">
+                <el-table-column label="产品名称" min-width="200">
                   <template #default="{ row, $index }">
-                    <el-select v-model="row.product_id" placeholder="选择商品" style="width: 100%" @change="onProductChange($index + (itemPage - 1) * pageSize)" filterable>
-                      <el-option v-for="p in products" :key="p.id" :label="p.name" :value="p.id" />
-                    </el-select>
+                    <div style="display: flex; gap: 4px;">
+                      <el-input v-model="row.product_name" size="small" placeholder="选择商品" style="flex: 1;" />
+                      <el-button size="small" icon="Search" @click="openProductSelector($index + (itemPage - 1) * pageSize)" />
+                    </div>
                   </template>
                 </el-table-column>
                 <el-table-column label="规格" min-width="100">
@@ -189,7 +190,7 @@
                 </el-table-column>
                 <template #append>
                   <div style="padding: 8px; border-top: 1px solid #ebeef5">
-                    <el-button type="primary" size="small" @click="addItem">添加货品</el-button>
+                    <el-button type="primary" size="small" @click="addItem">添加商品</el-button>
                   </div>
                 </template>
               </el-table>
@@ -360,11 +361,60 @@
         </el-tabs>
       </el-form>
     </el-card>
+
+    <el-dialog v-model="productDialogVisible" title="选择商品" width="900px">
+      <div style="display: flex; gap: 20px;">
+        <div style="flex: 1; min-width: 0;">
+          <el-form inline :model="dialogSearch" style="margin-bottom: 12px;">
+            <el-form-item label="商品名称">
+              <el-input v-model="dialogSearch.keyword" placeholder="商品名称" clearable style="width: 200px" />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="searchDialogProducts">查询</el-button>
+              <el-button @click="resetDialogSearch">重置</el-button>
+            </el-form-item>
+          </el-form>
+          <el-table ref="productTableRef" :data="dialogProducts" v-loading="dialogLoading" stripe border @selection-change="onDialogSelectionChange">
+            <el-table-column type="selection" width="55" />
+            <el-table-column prop="name" label="商品名称" min-width="140" />
+            <el-table-column prop="spec" label="规格型号" width="120" />
+            <el-table-column prop="material_grade" label="材质等级" width="100" />
+            <el-table-column prop="surface_treatment" label="表面处理" width="130" />
+            <el-table-column prop="unit_name" label="计量单位" width="100" />
+          </el-table>
+          <el-pagination
+            v-model:current-page="dialogPage"
+            :page-size="10"
+            :total="dialogTotal"
+            layout="total, prev, pager, next"
+            style="margin-top: 10px; justify-content: center"
+            @current-change="loadDialogProducts"
+          />
+        </div>
+        <div style="width: 200px; border-left: 1px solid #ebeef5; padding-left: 16px;">
+          <h4 style="margin-top: 0;">已选商品</h4>
+          <div v-if="dialogSelectedProducts.length === 0" style="color: #999; font-size: 13px;">暂无选择</div>
+          <el-tag
+            v-for="p in dialogSelectedProducts"
+            :key="p.id"
+            closable
+            @close="removeDialogSelection(p)"
+            style="display: block; margin-bottom: 8px;"
+          >
+            {{ p.name }}
+          </el-tag>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="productDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmDialogSelection">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getSale, createSale, updateSale } from '../api/modules/sales'
@@ -380,7 +430,6 @@ const pageSize = 10
 const isEdit = computed(() => !!route.params.id)
 
 const customers = ref([])
-const products = ref([])
 const formRef = ref()
 const form = reactive({
   id: null,
@@ -438,14 +487,19 @@ const goBack = () => {
   router.push('/sales')
 }
 
+const productDialogVisible = ref(false)
+const dialogProducts = ref([])
+const dialogLoading = ref(false)
+const dialogPage = ref(1)
+const dialogTotal = ref(0)
+const dialogSelectedProducts = ref([])
+const productTableRef = ref()
+const dialogSearch = reactive({ keyword: '' })
+
 const loadOptions = async () => {
   try {
-    const [cRes, pRes] = await Promise.all([
-      getCustomers({ page: 1, per_page: 100 }),
-      getProducts({ page: 1, per_page: 100 })
-    ])
+    const cRes = await getCustomers({ page: 1, per_page: 100 })
     customers.value = cRes.data.items || []
-    products.value = pRes.data.items || []
   } catch (e) {
     console.error(e)
   }
@@ -484,32 +538,103 @@ const deleteSupplier = (idx) => {
   }
 }
 
-const addItem = () => {
-  form.items.push({ product_id: null, spec: '', material_grade: '', surface_treatment: '', package_quantity: 0, package_count: 0, matching: '', unit_name: '', quantity: 1, unit_price: 0, amount: 0, remark: '' })
-  itemPage.value = Math.ceil(form.items.length / pageSize)
-}
-
 const addSupplier = () => {
   form.suppliers.push({ supplier: '', product: '', spec: '', grade: '', surface_treatment: '', cost: 0, quantity: 0, total_weight: 0, unit_weight: 0, price: 0, packaging: '', freight: 0, ton_bag_forklift: '', remark: '' })
   supplierPage.value = Math.ceil(form.suppliers.length / pageSize)
+}
+
+const editingItemIndex = ref(null)
+
+const addItem = () => {
+  form.items.push({ product_id: null, product_name: '', spec: '', material_grade: '', surface_treatment: '', package_quantity: 0, package_count: 0, matching: '', unit_name: '', quantity: 1, unit_price: 0, amount: 0, remark: '' })
+  itemPage.value = Math.ceil(form.items.length / pageSize)
 }
 
 const addLogistics = () => {
   form.logistics.push({ company: '', contact_phone: '', start_time: '', end_time: '', transport_status: '', freight: 0, forklift_fee: '', other_fee: '', remark: '' })
 }
 
-const onProductChange = (index) => {
-  const product = products.value.find(p => p.id === form.items[index].product_id)
-  if (product) {
-    form.items[index].spec = product.spec || ''
-    form.items[index].material_grade = product.material_grade || ''
-    form.items[index].surface_treatment = product.surface_treatment || ''
-    form.items[index].unit_name = product.unit_name || ''
-    if (!form.items[index].unit_price) {
-      form.items[index].unit_price = product.sale_price || 0
-    }
-    calcItemAmount(form.items[index])
+const openProductSelector = (index) => {
+  editingItemIndex.value = index
+  productDialogVisible.value = true
+  dialogSelectedProducts.value = []
+  dialogSearch.keyword = ''
+  dialogPage.value = 1
+  loadDialogProducts()
+}
+
+const loadDialogProducts = async () => {
+  dialogLoading.value = true
+  try {
+    const res = await getProducts({ page: dialogPage.value, per_page: 10, search: dialogSearch.keyword || '' })
+    dialogProducts.value = res.data.items || []
+    dialogTotal.value = res.data.total || 0
+  } catch (e) {
+    console.error(e)
+  } finally {
+    dialogLoading.value = false
   }
+}
+
+const searchDialogProducts = () => {
+  dialogPage.value = 1
+  loadDialogProducts()
+}
+
+const resetDialogSearch = () => {
+  dialogSearch.keyword = ''
+  dialogPage.value = 1
+  loadDialogProducts()
+}
+
+const onDialogSelectionChange = (selection) => {
+  dialogSelectedProducts.value = selection
+}
+
+const removeDialogSelection = (product) => {
+  const idx = dialogSelectedProducts.value.findIndex(p => p.id === product.id)
+  if (idx > -1) {
+    dialogSelectedProducts.value.splice(idx, 1)
+    if (productTableRef.value) {
+      productTableRef.value.toggleRowSelection(product, false)
+    }
+  }
+}
+
+const confirmDialogSelection = () => {
+  const selected = dialogSelectedProducts.value
+  if (selected.length === 0) {
+    productDialogVisible.value = false
+    return
+  }
+  const makeItem = (p) => ({
+    product_id: p.id,
+    product_name: p.name,
+    spec: p.spec || '',
+    material_grade: p.material_grade || '',
+    surface_treatment: p.surface_treatment || '',
+    unit_name: p.unit_name || '',
+    package_quantity: 0,
+    package_count: 0,
+    matching: '',
+    quantity: 1,
+    unit_price: p.sale_price || 0,
+    amount: p.sale_price || 0,
+    remark: ''
+  })
+  if (editingItemIndex.value !== null) {
+    form.items[editingItemIndex.value] = makeItem(selected[0])
+    for (let i = 1; i < selected.length; i++) {
+      form.items.splice(editingItemIndex.value + i, 0, makeItem(selected[i]))
+    }
+  } else {
+    for (const p of selected) {
+      form.items.push(makeItem(p))
+    }
+  }
+  editingItemIndex.value = null
+  productDialogVisible.value = false
+  itemPage.value = Math.ceil(form.items.length / pageSize)
 }
 
 const calcItemAmount = (row) => {

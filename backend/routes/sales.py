@@ -70,10 +70,11 @@ def serialize_logistics(l):
 
 
 def serialize_item(i):
+    pname = i.product_name or (i.product.name if i.product else None)
     return {
         'id': i.id,
         'product_id': i.product_id,
-        'product_name': i.product.name if i.product else None,
+        'product_name': pname,
         'product_code': i.product.code if i.product else None,
         'spec': i.spec,
         'material_grade': i.material_grade,
@@ -169,9 +170,15 @@ def create_sale():
         unit_price = float(item_data.get('unit_price', 0))
         amount = quantity * unit_price
         
+        pname = item_data.get('product_name')
+        if not pname and item_data.get('product_id'):
+            p = Product.query.get(item_data['product_id'])
+            if p:
+                pname = p.name
         item = SalesOrderItem(
             order_id=order.id,
             product_id=item_data.get('product_id'),
+            product_name=pname or '',
             spec=item_data.get('spec'),
             material_grade=item_data.get('material_grade'),
             surface_treatment=item_data.get('surface_treatment'),
@@ -272,9 +279,15 @@ def update_sale(id):
             unit_price = float(item_data.get('unit_price', 0))
             amount = quantity * unit_price
             
+            pname = item_data.get('product_name')
+            if not pname and item_data.get('product_id'):
+                p = Product.query.get(item_data['product_id'])
+                if p:
+                    pname = p.name
             item = SalesOrderItem(
                 order_id=order.id,
                 product_id=item_data.get('product_id'),
+                product_name=pname or '',
                 spec=item_data.get('spec'),
                 material_grade=item_data.get('material_grade'),
                 surface_treatment=item_data.get('surface_treatment'),
@@ -779,6 +792,41 @@ def deliver_sale(id):
 
         po.total_amount = po_total
 
+    # Auto-create products for items whose name+spec+grade+treatment combo doesn't exist
+    for item in order.items:
+        pname = item.product_name or (item.product.name if item.product else '')
+        if not pname:
+            continue
+        s = item.spec or ''
+        g = item.material_grade or ''
+        t = item.surface_treatment or ''
+        existing = Product.query.filter(Product.name == pname).first()
+        if existing:
+            mismatch = False
+            if s and s != (existing.spec or ''):
+                mismatch = True
+            if g and g != (existing.material_grade or ''):
+                mismatch = True
+            if t and t != (existing.surface_treatment or ''):
+                mismatch = True
+            if not mismatch:
+                continue
+        code = f'IMP{datetime.now().strftime("%y%m%d%H%M%S")}{uuid.uuid4().hex[:2].upper()}'
+        new_product = Product(
+            code=code,
+            name=pname,
+            spec=item.spec or '',
+            material_grade=item.material_grade or '',
+            surface_treatment=item.surface_treatment or '',
+            cost_price=0,
+            sale_price=float(item.unit_price) if item.unit_price else 0,
+            status=1
+        )
+        db.session.add(new_product)
+        db.session.flush()
+        inv = Inventory(product_id=new_product.id, quantity=0)
+        db.session.add(inv)
+
     order.status = 'delivered'
     db.session.commit()
     
@@ -1092,13 +1140,45 @@ def delete_sale(id):
 def cancel_sale(id):
     order = SalesOrder.query.get_or_404(id)
     
-    if order.status == 'delivered':
-        return jsonify({'error': 'Delivered order cannot be cancelled'}), 400
-    
     if order.status == 'cancelled':
         return jsonify({'error': 'Order already cancelled'}), 400
     
     order.status = 'cancelled'
+    db.session.commit()
+    
+    return jsonify(serialize_order(order))
+
+
+@bp.route('/<int:id>/withdraw', methods=['POST'])
+@jwt_required()
+def withdraw_sale(id):
+    order = SalesOrder.query.get_or_404(id)
+    
+    if order.status != 'delivered':
+        return jsonify({'error': 'Only delivered orders can be withdrawn'}), 400
+    
+    for item in order.items:
+        product = Product.query.get(item.product_id)
+        if not product:
+            continue
+        
+        inventory = Inventory.query.filter_by(product_id=item.product_id).first()
+        if inventory:
+            inventory.quantity += item.quantity
+        
+        log = InventoryLog(
+            product_id=item.product_id,
+            change_type='withdraw',
+            quantity=item.quantity,
+            order_no=order.order_no
+        )
+        db.session.add(log)
+    
+    auto_pos = PurchaseOrder.query.filter(PurchaseOrder.order_no.like(f'{order.order_no}-%')).all()
+    for po in auto_pos:
+        db.session.delete(po)
+    
+    order.status = 'draft'
     db.session.commit()
     
     return jsonify(serialize_order(order))

@@ -4,8 +4,8 @@
       <h2>销售管理</h2>
       <div>
         <input ref="fileInput" type="file" accept=".xls,.xlsx" style="display:none" @change="handleFileUpload" />
-        <el-button type="warning" @click="handleExport" :disabled="selectedRows.length !== 1">导出</el-button>
-        <el-button type="warning" @click="handleCopy" :disabled="selectedRows.length !== 1">复制</el-button>
+        <el-button @click="handleExport" :disabled="selectedRows.length !== 1">导出</el-button>
+        <el-button type="info" @click="handleCopy" :disabled="selectedRows.length !== 1">复制</el-button>
         <el-button type="success" @click="$refs.fileInput.click()">导入订货单</el-button>
         <el-button type="primary" @click="handleAdd">新建订货单</el-button>
       </div>
@@ -28,10 +28,10 @@
       </el-form>
     </el-card>
     <el-card>
-      <el-table ref="tableRef" :data="tableData" v-loading="loading" stripe @selection-change="handleSelectionChange" @select="handleSelect">
+      <el-table ref="tableRef" :data="tableData" v-loading="loading" stripe border @selection-change="handleSelectionChange" @select="handleSelect">
         <el-table-column type="selection" width="55" :selectable="(row) => row.status === 'delivered'" />
         <el-table-column type="index" label="序号" width="60" />
-        <el-table-column prop="order_no" label="订货单号" width="150" />
+        <el-table-column prop="order_no" label="订货单号" width="180" />
         <el-table-column prop="customer_name" label="客户" />
         <el-table-column prop="order_date" label="订单日期" width="120" />
         <el-table-column prop="total_amount" label="订单金额" width="120" />
@@ -47,11 +47,13 @@
           </template>
         </el-table-column>
         <el-table-column prop="remark" label="备注" />
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button v-if="row.status === 'draft'" size="small" type="primary" @click="handleDeliver(row)">出库</el-button>
-            <el-button size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="row.status === 'draft'" size="small" @click="handleEdit(row)">编辑</el-button>
+            <el-button v-if="row.status === 'draft'" size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="row.status === 'delivered'" size="small" @click="handleView(row)">查看</el-button>
+            <el-button v-if="row.status === 'delivered'" size="small" type="warning" @click="handleWithdraw(row)">撤回</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -66,7 +68,95 @@
       />
     </el-card>
 
-
+    <el-dialog v-model="viewDialogVisible" title="订货单详情" width="900px">
+      <el-form label-width="120px">
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="客户">
+              <span>{{ viewData.customer_name }}</span>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="联系人">
+              <span>{{ viewData.contact_person }}</span>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="联系电话">
+              <span>{{ viewData.contact_phone }}</span>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="业务负责人">
+              <span>{{ viewData.business_manager }}</span>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="订单日期">
+              <span>{{ viewData.order_date }}</span>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="订单金额">
+              <span>{{ viewData.total_amount?.toFixed(2) }}</span>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="毛利润">
+              <span>{{ viewData.gross_profit?.toFixed(2) }}</span>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="状态">
+              <el-tag :type="getStatusType(viewData.status)">{{ getStatusText(viewData.status) }}</el-tag>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="付款方式">
+          <span>{{ viewData.payment_method }}</span>
+        </el-form-item>
+        <el-form-item label="地址">
+          <span>{{ viewData.address }}</span>
+        </el-form-item>
+        <el-form-item label="备注">
+          <span>{{ viewData.remark }}</span>
+        </el-form-item>
+        <el-form-item label="商品明细">
+          <el-table :data="viewData.items" border size="small" max-height="300">
+            <el-table-column label="商品" width="140">
+              <template #default="{ row }">{{ row.product_name }}</template>
+            </el-table-column>
+            <el-table-column label="规格" width="90">
+              <template #default="{ row }">{{ row.spec }}</template>
+            </el-table-column>
+            <el-table-column label="材质等级" width="90">
+              <template #default="{ row }">{{ row.material_grade }}</template>
+            </el-table-column>
+            <el-table-column label="数量" width="80">
+              <template #default="{ row }">{{ row.quantity }}</template>
+            </el-table-column>
+            <el-table-column label="单价" width="80">
+              <template #default="{ row }">{{ row.unit_price }}</template>
+            </el-table-column>
+            <el-table-column label="金额" width="90">
+              <template #default="{ row }">{{ row.amount?.toFixed(2) }}</template>
+            </el-table-column>
+            <el-table-column label="备注" min-width="100">
+              <template #default="{ row }">{{ row.remark }}</template>
+            </el-table-column>
+          </el-table>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="viewDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -74,7 +164,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getSales, deleteSale, deliverSale, uploadSale, copySale, exportSale } from '../api/modules/sales'
+import { getSales, getSale, deleteSale, deliverSale, uploadSale, copySale, exportSale, withdrawSale } from '../api/modules/sales'
 
 const router = useRouter()
 const loading = ref(false)
@@ -204,6 +294,34 @@ const handleCopy = async () => {
     loadData()
   } catch (e) {
     ElMessage.error('复制失败')
+  }
+}
+
+const viewDialogVisible = ref(false)
+const viewData = reactive({
+  id: null, order_no: '', customer_name: '', contact_person: '', contact_phone: '',
+  business_manager: '', business_manager_phone: '', order_date: '', total_amount: 0,
+  gross_profit: 0, status: '', remark: '', payment_method: '', address: '', items: []
+})
+
+const handleView = async (row) => {
+  try {
+    const res = await getSale(row.id)
+    Object.assign(viewData, res.data)
+    viewDialogVisible.value = true
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+const handleWithdraw = async (row) => {
+  await ElMessageBox.confirm('确认撤回？撤回后该订货单将恢复为草稿状态。', '提示', { type: 'warning' })
+  try {
+    await withdrawSale(row.id)
+    ElMessage.success('撤回成功')
+    loadData()
+  } catch (e) {
+    console.error(e)
   }
 }
 

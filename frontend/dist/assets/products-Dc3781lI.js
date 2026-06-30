@@ -1,1 +1,0 @@
-import{y as s}from"./index-DsVx45G4.js";const c=t=>s.get("/products",{params:t}),r=t=>s.post("/products",t),a=(t,e)=>s.put(`/products/${t}`,e),d=t=>s.delete(`/products/${t}`),u=()=>s.get("/categories"),n=()=>s.get("/units");export{u as a,n as b,r as c,d,c as g,a as u};

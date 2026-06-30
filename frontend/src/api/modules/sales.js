@@ -8,6 +8,7 @@ export const deleteSale = (id) => axios.delete(`/sales/${id}`)
 export const deliverSale = (id, data) => axios.post(`/sales/${id}/deliver`, data)
 export const copySale = (id) => axios.post(`/sales/${id}/copy`)
 export const exportSale = (id) => axios.get(`/sales/${id}/export`, { responseType: 'blob' })
+export const withdrawSale = (id) => axios.post(`/sales/${id}/withdraw`)
 export const uploadSale = (file) => {
   const formData = new FormData()
   formData.append('file', file)

@@ -22,17 +22,17 @@
       </div>
     </div>
     <el-card style="width: 100%">
-      <el-table :data="tableData" v-loading="loading" stripe style="width: 100%">
+      <el-table :data="tableData" v-loading="loading" stripe border style="width: 100%">
         <el-table-column type="index" label="序号" width="60" />
-        <el-table-column prop="code" label="客户编码" width="120" />
-        <el-table-column prop="name" label="客户名称" min-width="130" />
-        <el-table-column prop="level" label="等级" width="80" />
-        <el-table-column prop="contact" label="联系人" min-width="90" />
-        <el-table-column prop="phone" label="联系电话" min-width="130" />
-        <el-table-column prop="company_name" label="公司全称" min-width="180" />
-        <el-table-column prop="tax_id" label="纳税人识别号" min-width="150" />
-        <el-table-column prop="invoice_type" label="发票类型" min-width="120" />
-        <el-table-column prop="status" label="合作状态" width="90">
+        <el-table-column prop="code" label="客户编码" width="180" />
+        <el-table-column prop="name" label="客户名称" width="200" align="center" />
+        <el-table-column prop="level" label="等级" width="80" align="center" />
+        <el-table-column prop="contact" label="联系人" min-width="90" align="center" />
+        <el-table-column prop="phone" label="联系电话" min-width="130" align="center" />
+        <el-table-column prop="company_name" label="公司全称" min-width="180" align="center" />
+        <el-table-column prop="tax_id" label="纳税人识别号" min-width="150" align="center" />
+        <el-table-column prop="invoice_type" label="发票类型" min-width="120" align="center" />
+        <el-table-column prop="status" label="合作状态" width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'danger'">
               {{ row.status === 1 ? '合作中' : '已停止' }}

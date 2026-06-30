@@ -22,23 +22,25 @@
           <el-button @click="resetSearch">重置</el-button>
         </el-form-item>
       </el-form>
-      <el-table :data="tableData" v-loading="loading" stripe>
+      <el-table :data="tableData" v-loading="loading" stripe border>
         <el-table-column type="index" label="序号" width="60" />
-        <el-table-column prop="order_no" label="采购单号" width="150" />
-        <el-table-column prop="supplier_name" label="供应商" />
-        <el-table-column prop="order_date" label="订单日期" width="120" />
-        <el-table-column prop="total_amount" label="总金额" width="120" />
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="order_no" label="采购单号" width="200" />
+        <el-table-column prop="supplier_name" label="供应商" width="200" align="center" />
+        <el-table-column prop="order_date" label="订单日期" width="200" align="center" />
+        <el-table-column prop="total_amount" label="总金额" width="200" align="center" />
+        <el-table-column prop="status" label="状态" width="180" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)">{{ getStatusText(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="remark" label="备注" />
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column prop="remark" label="备注" min-width="200" align="center" />
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button v-if="row.status === 'draft'" size="small" type="primary" @click="handleReceive(row)">入库</el-button>
-            <el-button size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="row.status === 'draft'" size="small" @click="handleEdit(row)">编辑</el-button>
+            <el-button v-if="row.status === 'draft'" size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="row.status === 'received'" size="small" @click="handleView(row)">查看</el-button>
+            <el-button v-if="row.status === 'received'" size="small" type="warning" @click="handleWithdraw(row)">撤回</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -139,13 +141,73 @@
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="viewDialogVisible" title="采购订单详情" width="800px">
+      <el-form label-width="100px">
+        <el-form-item label="供应商">
+          <span>{{ viewData.supplier_name }}</span>
+        </el-form-item>
+        <el-form-item label="订单日期">
+          <span>{{ viewData.order_date }}</span>
+        </el-form-item>
+        <el-form-item label="总金额">
+          <span>{{ viewData.total_amount?.toFixed(2) }}</span>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-tag :type="getStatusType(viewData.status)">{{ getStatusText(viewData.status) }}</el-tag>
+        </el-form-item>
+        <el-form-item label="备注">
+          <span>{{ viewData.remark }}</span>
+        </el-form-item>
+        <el-form-item label="商品明细">
+          <el-table :data="viewData.items" border size="small" max-height="400">
+            <el-table-column label="商品" width="160">
+              <template #default="{ row }">{{ row.product_name }}</template>
+            </el-table-column>
+            <el-table-column label="规格" width="100">
+              <template #default="{ row }">{{ row.spec }}</template>
+            </el-table-column>
+            <el-table-column label="等级" width="80">
+              <template #default="{ row }">{{ row.grade }}</template>
+            </el-table-column>
+            <el-table-column label="表面处理" width="100">
+              <template #default="{ row }">{{ row.surface_treatment }}</template>
+            </el-table-column>
+            <el-table-column label="数量" width="90">
+              <template #default="{ row }">{{ row.quantity }}</template>
+            </el-table-column>
+            <el-table-column label="总重" width="90">
+              <template #default="{ row }">{{ row.total_weight }}</template>
+            </el-table-column>
+            <el-table-column label="单重" width="90">
+              <template #default="{ row }">{{ row.unit_weight }}</template>
+            </el-table-column>
+            <el-table-column label="单价" width="90">
+              <template #default="{ row }">{{ row.unit_price }}</template>
+            </el-table-column>
+            <el-table-column label="包装" width="100">
+              <template #default="{ row }">{{ row.packaging }}</template>
+            </el-table-column>
+            <el-table-column label="税费" width="90">
+              <template #default="{ row }">{{ row.tax }}</template>
+            </el-table-column>
+            <el-table-column label="金额" width="90">
+              <template #default="{ row }">{{ row.amount?.toFixed(2) }}</template>
+            </el-table-column>
+          </el-table>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="viewDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getPurchases, createPurchase, updatePurchase, deletePurchase, receivePurchase } from '../api/modules/purchases'
+import { getPurchases, getPurchase, createPurchase, updatePurchase, deletePurchase, receivePurchase, withdrawPurchase } from '../api/modules/purchases'
 import { getSuppliers } from '../api/modules/suppliers'
 import { getProducts } from '../api/modules/products'
 
@@ -269,6 +331,33 @@ const handleReceive = async (row) => {
   try {
     await receivePurchase(row.id)
     ElMessage.success('入库成功')
+    loadData()
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+const viewDialogVisible = ref(false)
+const viewData = reactive({
+  id: null, order_no: '', supplier_name: '', order_date: '', total_amount: 0,
+  status: '', remark: '', items: []
+})
+
+const handleView = async (row) => {
+  try {
+    const res = await getPurchase(row.id)
+    Object.assign(viewData, res.data)
+    viewDialogVisible.value = true
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+const handleWithdraw = async (row) => {
+  await ElMessageBox.confirm('确认撤回？撤回后该订单将恢复为草稿状态。', '提示', { type: 'warning' })
+  try {
+    await withdrawPurchase(row.id)
+    ElMessage.success('撤回成功')
     loadData()
   } catch (e) {
     console.error(e)

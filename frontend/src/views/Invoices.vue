@@ -21,7 +21,7 @@
           <el-button type="primary" @click="loadData">查询</el-button>
         </el-form-item>
       </el-form>
-      <el-table :data="tableData" v-loading="loading" stripe>
+      <el-table :data="tableData" v-loading="loading" stripe border>
         <el-table-column type="index" label="序号" width="60" />
         <el-table-column prop="order_no" label="订货单号" width="180" />
         <el-table-column prop="total_amount" label="订单金额" width="120" :formatter="(r) => formatAmount(r.total_amount)" />

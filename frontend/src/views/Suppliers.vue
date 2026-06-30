@@ -5,13 +5,14 @@
       <el-button type="primary" @click="handleAdd">新增供应商</el-button>
     </div>
     <el-card>
-      <el-table :data="tableData" v-loading="loading" stripe>
+      <el-table :data="tableData" v-loading="loading" stripe border>
         <el-table-column type="index" label="序号" width="60" />
-        <el-table-column prop="code" label="供应商编码" width="120" />
-        <el-table-column prop="name" label="供应商名称" />
+        <el-table-column prop="code" label="供应商编码" width="180" />
+        <el-table-column prop="name" label="供应商名称" width="200" align="center" />
         <el-table-column prop="contact" label="联系人" width="100" />
         <el-table-column prop="phone" label="电话" width="150" />
         <el-table-column prop="address" label="地址" />
+        <el-table-column prop="main_business" label="主营" width="200" />
         <el-table-column prop="status" label="状态" width="80">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'danger'">
@@ -54,6 +55,9 @@
         <el-form-item label="地址" prop="address">
           <el-input v-model="form.address" type="textarea" />
         </el-form-item>
+        <el-form-item label="主营" prop="main_business">
+          <el-input v-model="form.main_business" />
+        </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-switch v-model="form.status" :active-value="1" :inactive-value="0" />
         </el-form-item>
@@ -85,6 +89,7 @@ const form = reactive({
   contact: '',
   phone: '',
   address: '',
+  main_business: '',
   status: 1
 })
 
@@ -107,7 +112,7 @@ const loadData = async () => {
 }
 
 const handleAdd = () => {
-  Object.assign(form, { id: null, code: '', name: '', contact: '', phone: '', address: '', status: 1 })
+  Object.assign(form, { id: null, code: '', name: '', contact: '', phone: '', address: '', main_business: '', status: 1 })
   dialogTitle.value = '新增供应商'
   dialogVisible.value = true
 }

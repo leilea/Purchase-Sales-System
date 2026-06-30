@@ -14,18 +14,22 @@
           <el-button @click="searchForm.keyword = ''; loadData()">重置</el-button>
         </el-form-item>
       </el-form>
-      <el-table :data="tableData" v-loading="loading" stripe>
-        <el-table-column prop="product_code" label="商品编码" width="120" />
-        <el-table-column prop="product_name" label="商品名称" />
-        <el-table-column prop="quantity" label="当前库存" width="100" />
-        <el-table-column prop="stock_min" label="库存下限" width="100" />
-        <el-table-column prop="stock_max" label="库存上限" width="100" />
-        <el-table-column label="状态" width="100">
+      <el-table :data="tableData" v-loading="loading" stripe border>
+        <el-table-column prop="product_code" label="商品编码" width="200" />
+        <el-table-column prop="product_name" label="商品名称" min-width="160" />
+        <el-table-column prop="spec" label="规格型号" width="130" />
+        <el-table-column prop="material_grade" label="材质等级" width="120" />
+        <el-table-column prop="surface_treatment" label="表面处理" width="130" />
+        <el-table-column prop="unit_name" label="计量单位" width="110" />
+        <el-table-column prop="quantity" label="当前库存" width="110" />
+        <el-table-column prop="stock_min" label="库存下限" width="110" />
+        <el-table-column prop="stock_max" label="库存上限" width="110" />
+        <el-table-column label="状态" width="110">
           <template #default="{ row }">
             <el-tag :type="getStockStatus(row).type">{{ getStockStatus(row).text }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="updated_at" label="更新时间" width="180" />
+        <el-table-column prop="updated_at" label="更新时间" width="170" />
       </el-table>
       <el-pagination
         v-model:current-page="pagination.page"
@@ -42,7 +46,7 @@
       <template #header>
         <span>库存流水</span>
       </template>
-      <el-table :data="logs" v-loading="logsLoading" stripe size="small">
+      <el-table :data="logs" v-loading="logsLoading" stripe border size="small">
         <el-table-column prop="product_name" label="商品" />
         <el-table-column prop="change_type" label="变动类型" width="120">
           <template #default="{ row }">

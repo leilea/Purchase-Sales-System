@@ -79,7 +79,7 @@ def _migrate_db():
             db.session.execute(text(f'ALTER TABLE sales_orders ADD COLUMN {col} {typ}'))
     
     # SalesOrderItem new columns
-    for col, typ in [('spec', 'VARCHAR(200)'), ('material_grade', 'VARCHAR(100)'), ('surface_treatment', 'VARCHAR(200)'), ('matching', 'VARCHAR(100)'), ('package_quantity', 'NUMERIC(10,2) DEFAULT 0'), ('package_count', 'NUMERIC(10,2) DEFAULT 0'), ('remark', 'TEXT')]:
+    for col, typ in [('product_name', 'VARCHAR(200)'), ('spec', 'VARCHAR(200)'), ('material_grade', 'VARCHAR(100)'), ('surface_treatment', 'VARCHAR(200)'), ('matching', 'VARCHAR(100)'), ('package_quantity', 'NUMERIC(10,2) DEFAULT 0'), ('package_count', 'NUMERIC(10,2) DEFAULT 0'), ('remark', 'TEXT')]:
         if col not in [c['name'] for c in inspector.get_columns('sales_order_items')]:
             db.session.execute(text(f'ALTER TABLE sales_order_items ADD COLUMN {col} {typ}'))
     
@@ -87,6 +87,11 @@ def _migrate_db():
     for col, typ in [('spec', 'VARCHAR(200)'), ('grade', 'VARCHAR(100)'), ('surface_treatment', 'VARCHAR(200)'), ('total_weight', 'NUMERIC(10,3) DEFAULT 0'), ('unit_weight', 'NUMERIC(10,4) DEFAULT 0'), ('packaging', 'VARCHAR(200)'), ('tax', 'NUMERIC(10,2) DEFAULT 0')]:
         if col not in [c['name'] for c in inspector.get_columns('purchase_order_items')]:
             db.session.execute(text(f'ALTER TABLE purchase_order_items ADD COLUMN {col} {typ}'))
+
+    # Supplier new columns
+    for col, typ in [('main_business', 'VARCHAR(200)')]:
+        if col not in [c['name'] for c in inspector.get_columns('suppliers')]:
+            db.session.execute(text(f'ALTER TABLE suppliers ADD COLUMN {col} {typ}'))
 
     # Create new tables if not exist
     for table_name in ['sales_order_suppliers', 'sales_order_logistics']:
